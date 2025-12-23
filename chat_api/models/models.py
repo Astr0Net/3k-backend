@@ -47,7 +47,7 @@ class Message(db.Model):
 
     message_id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey("chats.chat_id"), nullable=False)
-    content = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.text, nullable=False)
     time = db.Column(db.String(255))  # طبق دیتابیس تو، ولی بهتره در عمل datetime باشه
     is_user = db.Column(db.Boolean, nullable=False)
 
