@@ -32,7 +32,7 @@ GPT_MODEL = Config.GPT_MODEL
 
 
 # ======================================================
-# 🎭 نقش (Persona) – فقط یک بار
+# 🎭 Persona (System Prompt)
 # ======================================================
 
 SYSTEM_PROMPT = """
@@ -40,7 +40,7 @@ SYSTEM_PROMPT = """
 
 قوانین:
 - پاسخ‌ها رسمی، دقیق و حمایتی باشند
-- فقط بر اساس اطلاعات مکالمه و داده‌های ارائه‌شده پاسخ بده
+- فقط بر اساس داده‌های ارائه‌شده پاسخ بده
 - از حدس، اغراق و اطلاعات ساختگی خودداری کن
 - زبان پاسخ‌ها فارسی باشد
 """
@@ -68,11 +68,11 @@ def cosine_similarity(a, b):
     b = np.array(b)
     if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
         return 0.0
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
 # ======================================================
-# 🧠 تحلیل رزومه و پیدا کردن بهترین شغل
+# 🧠 تحلیل رزومه و انتخاب ۳ شغل برتر
 # ======================================================
 
 def analyze_resume(user_text: str) -> str:
@@ -82,57 +82,75 @@ def analyze_resume(user_text: str) -> str:
 
     try:
         cursor.execute("""
-            SELECT id, company_name, job_url, raw_text, embedding
+            SELECT company_name, job_url, raw_text, embedding
             FROM jobs
             WHERE embedding IS NOT NULL;
         """)
         jobs = cursor.fetchall()
+
         if not jobs:
             return "❌ هیچ آگهی شغلی برای مقایسه یافت نشد."
 
         resume_embedding = get_embedding(user_text)
 
-        best_job = None
-        best_score = -1
+        scored_jobs = []
 
-        for job_id, company, url, text, emb in jobs:
+        for company, url, text, emb in jobs:
             score = cosine_similarity(resume_embedding, emb)
-            if score > best_score:
-                best_score = score
-                best_job = {
-                    "company": company,
-                    "url": url,
-                    "text": text,
-                    "score": score
-                }
+            scored_jobs.append({
+                "company": company,
+                "url": url,
+                "text": text,
+                "score": score
+            })
 
-        company_name = keep_only_persian(best_job["company"]).strip()
+        # مرتب‌سازی و انتخاب ۳ شغل برتر
+        scored_jobs.sort(key=lambda x: x["score"], reverse=True)
+        top_jobs = scored_jobs[:3]
 
-        cursor.execute(
-            "SELECT reviews FROM public.companies WHERE name = %s;",
-            (company_name,)
-        )
-        reviews = cursor.fetchall()
+        jobs_with_reviews = []
 
-        prompt = f"""
-[آگهی شغلی]
-شرکت: {best_job['company']}
-لینک: {best_job['url']}
+        for job in top_jobs:
+            company_name = keep_only_persian(job["company"]).strip()
+
+            cursor.execute(
+                "SELECT reviews FROM public.companies WHERE name = %s;",
+                (company_name,)
+            )
+            reviews = cursor.fetchall()
+
+            job["reviews"] = reviews if reviews else "نظری ثبت نشده است."
+            jobs_with_reviews.append(job)
+
+        # ساخت متن گزارش
+        jobs_text = ""
+        for i, job in enumerate(jobs_with_reviews, start=1):
+            jobs_text += f"""
+==============================
+🔹 شغل شماره {i}
+
+شرکت: {job['company']}
+لینک: {job['url']}
+درصد تطابق: {job['score'] * 100:.1f}٪
 
 [نظرات کاربران]
-{reviews if reviews else "نظری ثبت نشده است."}
+{job['reviews']}
 
 [متن آگهی]
-{best_job['text']}
+{job['text']}
+"""
 
-[درصد تطابق]
-{best_job['score'] * 100:.1f}٪
+        prompt = f"""
+بر اساس رزومه کاربر، ۳ موقعیت شغلی با بیشترین تطابق انتخاب شده‌اند.
+
+{jobs_text}
 
 گزارش حرفه‌ای شامل:
-1) خلاصه آگهی
-2) ارزیابی تطابق رزومه
-3) جمع‌بندی نظرات مثبت و منفی
-4) توصیه نهایی
+1) خلاصه هر آگهی
+2) ارزیابی تطابق رزومه با هر شغل
+3) تحلیل نظرات مثبت و منفی هر شرکت
+4) مقایسه نهایی بین ۳ شغل
+5) پیشنهاد بهترین گزینه برای اقدام به همراه دلیل
 """
 
         response = chat_client.chat.completions.create(
@@ -168,26 +186,25 @@ def generate_bot_reply(chat_id: int, user_text: str) -> str:
             "content": f"خلاصه مکالمه تا اینجا:\n{chat.summary}"
         })
 
-    # حافظه کوتاه‌مدت
-    recent = (
+    # حافظه کوتاه‌مدت (۶ پیام آخر)
+    recent_messages = (
         Message.query
         .filter_by(chat_id=chat_id)
         .order_by(Message.message_id.desc())
         .limit(6)
         .all()
     )
-    recent.reverse()
+    recent_messages.reverse()
 
-    for msg in recent:
+    for msg in recent_messages:
         messages.append({
             "role": "user" if msg.is_user else "assistant",
             "content": msg.content
         })
 
-    # تشخیص درخواست تحلیل رزومه
+    # تشخیص تحلیل رزومه
     if "رزومه" in user_text and "تحلیل" in user_text:
-        analysis = analyze_resume(user_text)
-        return analysis
+        return analyze_resume(user_text)
 
     # پیام جدید
     messages.append({"role": "user", "content": user_text})
