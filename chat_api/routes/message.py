@@ -4,6 +4,9 @@ from chat_api.models.models import Chat, Message
 from .botMessage import generate_bot_reply
 import re
 
+
+from datetime import datetime
+
 message_bp = Blueprint("message", __name__)
 
 STOP_WORDS = {
@@ -56,6 +59,10 @@ def create_message(chat_id):
     chat = Chat.query.get(chat_id)
     if not chat:
         return jsonify({"error": "chat not found"}), 404
+    
+    now = datetime.now()
+    time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+    print("START", time_str)
 
     data = request.get_json(silent=True) or {}
     content = data.get("content")
@@ -81,6 +88,9 @@ def create_message(chat_id):
     # 🔴 مهم: قبل از پاسخ بات، پیام کاربر ثبت شود
     db.session.flush()
 
+    now = datetime.now()
+    time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+    print("GEREFTAN USER TXT",time_str)
     # =========================
     # پاسخ بات (با حافظه)
     # =========================

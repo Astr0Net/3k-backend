@@ -1,4 +1,5 @@
 # bot_message.py
+from datetime import datetime
 
 import re
 import psycopg2
@@ -87,12 +88,16 @@ def analyze_resume(user_text: str) -> str:
             WHERE embedding IS NOT NULL;
         """)
         jobs = cursor.fetchall()
-
+        now = datetime.now()
+        time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+        print("START EMBED", time_str)
         if not jobs:
             return "❌ هیچ آگهی شغلی برای مقایسه یافت نشد."
 
         resume_embedding = get_embedding(user_text)
-
+        now = datetime.now()
+        time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+        print("END AMBED", time_str)
         scored_jobs = []
 
         for company, url, text, emb in jobs:
@@ -121,7 +126,9 @@ def analyze_resume(user_text: str) -> str:
 
             job["reviews"] = reviews if reviews else "نظری ثبت نشده است."
             jobs_with_reviews.append(job)
-
+        now = datetime.now()
+        time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+        print("GHABL AZ SKHT GOZARESH",time_str)
         # ساخت متن گزارش
         jobs_text = ""
         for i, job in enumerate(jobs_with_reviews, start=1):
@@ -160,7 +167,9 @@ def analyze_resume(user_text: str) -> str:
                 {"role": "user", "content": prompt}
             ]
         )
-
+        now = datetime.now()
+        time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+        print("BAAD AZ SAKHT GOZARESH",time_str)
         return response.choices[0].message.content
 
     finally:
@@ -195,7 +204,9 @@ def generate_bot_reply(chat_id: int, user_text: str) -> str:
         .all()
     )
     recent_messages.reverse()
-
+    now = datetime.now()
+    time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
+    print("GHAB AZ ANALIZ",time_str)
     for msg in recent_messages:
         messages.append({
             "role": "user" if msg.is_user else "assistant",
@@ -203,15 +214,15 @@ def generate_bot_reply(chat_id: int, user_text: str) -> str:
         })
 
     # تشخیص تحلیل رزومه
-    if "رزومه" in user_text and "تحلیل" in user_text:
-        return analyze_resume(user_text)
+    # if "رزومه" in user_text and "تحلیل" in user_text:
+    return analyze_resume(user_text)
 
-    # پیام جدید
-    messages.append({"role": "user", "content": user_text})
+    # # پیام جدید
+    # messages.append({"role": "user", "content": user_text})
 
-    response = chat_client.chat.completions.create(
-        model=GPT_MODEL,
-        messages=messages
-    )
+    # response = chat_client.chat.completions.create(
+    #     model=GPT_MODEL,
+    #     messages=messages
+    # )
 
-    return response.choices[0].message.content
+    # return response.choices[0].message.content
