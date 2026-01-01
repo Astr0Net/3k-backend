@@ -71,12 +71,50 @@ def cosine_similarity(a, b):
         return 0.0
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
+def detect_intent(user_text: str) -> str:
+    """
+    تشخیص اینکه کاربر قصد تحلیل رزومه دارد یا چت عادی
+    """
+    prompt = f"""
+    Analyze the user input.
+    If they are providing a resume/CV or asking for job recommendations based on their skills, respond with 'ANALYZE'.
+    If it's a general question, greeting, or follow-up chat, respond with 'CHAT'.
+    
+    User Input: "{user_text}"
+    Response (ONLY one word):"""
+    
+    response = chat_client.chat.completions.create(
+        model=GPT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    return response.choices[0].message.content.strip().upper()
 
+def update_chat_summary(chat_id: int):
+    """
+    خلاصه‌سازی مکالمات برای مدیریت حافظه بلندمدت
+    """
+    chat = Chat.query.get(chat_id)
+    # دریافت ۱۰ پیام آخر برای خلاصه‌سازی
+    recent_msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.message_id.desc()).limit(10).all()
+    recent_msgs.reverse()
+    
+    chat_history = "\n".join([f"{'User' if m.is_user else 'Bot'}: {m.content}" for m in recent_msgs])
+    
+    prompt = f"خلاصه کوتاه و دقیق مکالمه زیر را به فارسی بنویس تا در مراجعات بعدی استفاده شود:\n\n{chat_history}"
+    
+    response = chat_client.chat.completions.create(
+        model=GPT_MODEL,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    
+    chat.summary = response.choices[0].message.content.strip()
+    db.session.commit()
 # ======================================================
 # 🧠 تحلیل رزومه و انتخاب ۳ شغل برتر
 # ======================================================
 
-def analyze_resume(user_text: str) -> str:
+def analyze_resume(user_text: str):
     conn = psycopg2.connect(DATABASE_URL)
     register_vector(conn)
     cursor = conn.cursor()
@@ -92,7 +130,8 @@ def analyze_resume(user_text: str) -> str:
         time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
         print("START EMBED", time_str)
         if not jobs:
-            return "❌ هیچ آگهی شغلی برای مقایسه یافت نشد."
+            yield "❌ هیچ آگهی شغلی برای مقایسه یافت نشد."
+            return
 
         resume_embedding = get_embedding(user_text)
         now = datetime.now()
@@ -160,17 +199,21 @@ def analyze_resume(user_text: str) -> str:
 5) پیشنهاد بهترین گزینه برای اقدام به همراه دلیل
 """
 
-        response = chat_client.chat.completions.create(
+        stream = chat_client.chat.completions.create(
             model=GPT_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            stream=True
         )
+        for event in stream:
+            delta = event.choices[0].delta
+            if delta and getattr(delta, "content", None):
+                yield delta.content
         now = datetime.now()
         time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
         print("BAAD AZ SAKHT GOZARESH",time_str)
-        return response.choices[0].message.content
 
     finally:
         cursor.close()
@@ -180,49 +223,57 @@ def analyze_resume(user_text: str) -> str:
 # ======================================================
 # 🤖 تولید پاسخ بات (چت ادامه‌دار)
 # ======================================================
-
-def generate_bot_reply(chat_id: int, user_text: str) -> str:
+def generate_bot_reply(chat_id: int, user_text: str):
     chat = Chat.query.get(chat_id)
     if not chat:
-        return "❌ چت یافت نشد."
+        yield "error", "❌ چت یافت نشد."
+        return
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # ۱. تشخیص قصد کاربر (Intent Detection)
+    intent = detect_intent(user_text)
+    
+    # ۲. ارسال سیگنال نوع پیام به لایه روت
+    yield "intent", intent.lower()
 
-    # حافظه بلندمدت
-    if chat.summary:
-        messages.append({
-            "role": "system",
-            "content": f"خلاصه مکالمه تا اینجا:\n{chat.summary}"
-        })
+    if intent == 'ANALYZE':
+        # اجرای تحلیل رزومه
+        for chunk in analyze_resume(user_text):
+            yield "content", chunk
+    else:
+        # مسیر چت عادی با استفاده از حافظه
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # حافظه کوتاه‌مدت (۶ پیام آخر)
-    recent_messages = (
-        Message.query
-        .filter_by(chat_id=chat_id)
-        .order_by(Message.message_id.desc())
-        .limit(6)
-        .all()
-    )
-    recent_messages.reverse()
-    now = datetime.now()
-    time_str = now.strftime("%H:%M:%S.%f")[:-4]  # صدم ثانیه
-    print("GHAB AZ ANALIZ",time_str)
-    for msg in recent_messages:
-        messages.append({
-            "role": "user" if msg.is_user else "assistant",
-            "content": msg.content
-        })
+        if chat.summary:
+            messages.append({"role": "system", "content": f"خلاصه مکالمات قبلی: {chat.summary}"})
 
-    # تشخیص تحلیل رزومه
-    # if "رزومه" in user_text and "تحلیل" in user_text:
-    return analyze_resume(user_text)
+        # بازیابی ۶ پیام آخر (حافظه کوتاه‌مدت)
+        recent_messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.message_id.desc()).limit(6).all()
+        recent_messages.reverse()
 
-    # # پیام جدید
-    # messages.append({"role": "user", "content": user_text})
+        for msg in recent_messages:
+            messages.append({
+                "role": "user" if msg.is_user else "assistant",
+                "content": msg.content
+            })
 
-    # response = chat_client.chat.completions.create(
-    #     model=GPT_MODEL,
-    #     messages=messages
-    # )
+        messages.append({"role": "user", "content": user_text})
 
-    # return response.choices[0].message.content
+        # تولید پاسخ استریمی برای چت عادی
+        stream = chat_client.chat.completions.create(
+            model=GPT_MODEL,
+            messages=messages,
+            stream=True
+        )
+
+        for event in stream:
+            delta = event.choices[0].delta
+            if delta and getattr(delta, "content", None):
+                yield "content", delta.content
+
+    # ۳. عملیات پس از پاسخ (خلاصه‌سازی خودکار)
+    try:
+        msg_count = Message.query.filter_by(chat_id=chat_id).count()
+        if msg_count > 0 and msg_count % 10 == 0:
+            update_chat_summary(chat_id)
+    except:
+        pass # جلوگیری از قطع شدن استریم در صورت خطای دیتابیس
