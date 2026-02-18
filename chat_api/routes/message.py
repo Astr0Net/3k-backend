@@ -1,11 +1,31 @@
 import json
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from flask_jwt_extended import jwt_required, get_jwt_identity
+
+from google import genai
+from google.genai import types
+
+from config import Config
 from ..extensions import db
 from chat_api.models.models import Chat, Message
-from .botMessage import generate_bot_reply, chat_client, GPT_MODEL
+from .botMessage import generate_bot_reply, maybe_update_chat_summary
+
 
 message_bp = Blueprint("message", __name__)
+
+# -------------------------
+# Gemini client (for title)
+# -------------------------
+if not Config.GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set")
+
+_gemini_client = genai.Client(api_key=Config.GEMINI_API_KEY)
+_GEMINI_CHAT_MODEL = Config.GEMINI_CHAT_MODEL
+
+_TITLE_SYSTEM = """
+شما یک دستیار فارسی‌زبان هستید.
+فقط یک عنوان خیلی کوتاه و مناسب بساز.
+""".strip()
 
 
 # -------------------------
@@ -59,19 +79,22 @@ def generate_ai_title(content: str) -> str:
             "فقط خود عنوان را برگردان:\n\n"
             f"{content}"
         )
-        response = chat_client.chat.completions.create(
-            model=GPT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=20,
-            temperature=0.7
+        resp = _gemini_client.models.generate_content(
+            model=_GEMINI_CHAT_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=20,
+                system_instruction=_TITLE_SYSTEM,
+            ),
         )
-        return (response.choices[0].message.content or "").strip().replace('"', '') or "چت جدید"
+        title = (resp.text or "").strip().replace('"', "")
+        return title or "چت جدید"
     except Exception:
         return "چت جدید"
 
 
 def _get_chat_if_owner(chat_id: int, user_id: int):
-    # این روش هم امن‌تره، هم اطلاعات اضافه لو نمی‌ده
     return Chat.query.filter_by(chat_id=chat_id, user_id=user_id).first()
 
 
@@ -93,7 +116,6 @@ def get_messages(chat_id):
         .all()
     )
 
-    # فقط چیزهای لازم
     data = {
         "chat": _chat_brief(chat),
         "messages": [_message_dto(m) for m in messages],
@@ -122,7 +144,6 @@ def create_message(chat_id):
     )
     db.session.add(user_msg)
 
-    # عنوان فقط وقتی لازم است ساخته شود
     title_changed = False
     if not chat.title or chat.title == "New Chat":
         new_title = generate_ai_title(content)
@@ -133,30 +154,38 @@ def create_message(chat_id):
     db.session.commit()
 
     def sse(event: str, payload: dict):
-        # payload همیشه JSON باشد تا فرانت یکدست parse کند
         return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
     def event_stream():
         full_text = ""
         try:
-            # ✅ enforce مالکیت در botMessage هم
             reply_gen = generate_bot_reply(chat_id, content, user_id=user_id)
 
-            # اولین yield باید intent باشد
-            tag, intent_type = next(reply_gen)
+            try:
+                first = next(reply_gen)
+            except StopIteration:
+                yield sse("error", {"message": "empty response from bot"})
+                return
+
+            tag, intent_type = first
+            if tag != "intent":
+                yield sse("error", {"message": "protocol error: first yield must be intent"})
+                return
 
             yield sse("meta", {
                 "chat": _chat_brief(chat),
                 "user_message_id": user_msg.message_id,
-                "type": intent_type,          # chat | analyze | error
+                "type": intent_type,
                 "title_changed": title_changed
             })
 
-            # stream chunks
             for tag, chunk in reply_gen:
-                if tag == "content" and chunk:
+                if tag == "jobs" and chunk:
+                    yield sse("jobs", chunk)
+
+                elif tag == "content" and chunk:
                     full_text += chunk
-                    yield sse("delta", {"text": chunk})
+                    yield sse("content", {"delta": chunk})
 
             bot_msg = Message(
                 chat_id=chat_id,
@@ -166,12 +195,13 @@ def create_message(chat_id):
             )
             db.session.add(bot_msg)
             db.session.commit()
+            
+            maybe_update_chat_summary(chat_id, user_id=user_id)
 
             yield sse("done", {"bot_message_id": bot_msg.message_id})
 
         except Exception as e:
             db.session.rollback()
-            # خطا هم JSON استاندارد داخل SSE
             yield sse("error", {"message": str(e)})
 
     return Response(

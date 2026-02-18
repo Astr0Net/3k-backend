@@ -21,24 +21,13 @@ PASSWORD_MAX = 128
 _username_re = re.compile(r"^[a-z0-9._-]+$")
 
 
-# -------------------------
-# Response helpers (Standard API Contract)
-# -------------------------
 def api_ok(data=None, message="ok", http_status=200):
-    payload = {
-        "status": http_status,
-        "message": message,
-        "data": data,
-    }
+    payload = {"status": http_status, "message": message, "data": data}
     return jsonify(payload), http_status
 
 
 def api_error(message="error", http_status=400, data=None):
-    payload = {
-        "status": http_status,
-        "error": message,
-        "data": data,
-    }
+    payload = {"status": http_status, "error": message, "data": data}
     return jsonify(payload), http_status
 
 
@@ -86,12 +75,7 @@ def register():
         db.session.rollback()
         return api_error("username already exists", 409)
 
-    # فقط چیزهای لازم در data
-    return api_ok(
-        data={"user": user.to_dict()},
-        message="user created",
-        http_status=201,
-    )
+    return api_ok(data={"user": user.to_dict()}, message="user created", http_status=201)
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -105,15 +89,13 @@ def login():
 
     user = User.query.filter_by(username=username).first()
 
-    # پیام خطا generic برای جلوگیری از user enumeration
     if not user or not bcrypt.check_password_hash(user.password, password):
         return api_error("invalid credentials", 401)
 
-    # ✅ JWT identity عددی (نه string) -> تمیزتر و بدون int()/str()های اضافی
-    access_token = create_access_token(identity=user.user_id)
-    refresh_token = create_refresh_token(identity=user.user_id)
+    # ✅ identity باید string باشد تا sub در JWT استاندارد باشد
+    access_token = create_access_token(identity=str(user.user_id))
+    refresh_token = create_refresh_token(identity=str(user.user_id))
 
-    # فقط چیزهای لازم در data
     return api_ok(
         data={
             "user": user.to_dict(),
@@ -129,8 +111,8 @@ def login():
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
-    user_id = get_jwt_identity()  # اینجا int است
-    new_access = create_access_token(identity=user_id)
+    user_id = get_jwt_identity()  # string
+    new_access = create_access_token(identity=str(user_id))
 
     return api_ok(
         data={"access_token": new_access, "token_type": "Bearer"},
@@ -145,33 +127,24 @@ def logout():
     jwt_payload = get_jwt()
     jti = jwt_payload.get("jti")
     token_type = jwt_payload.get("type", "access")
-    user_id = get_jwt_identity()  # int
+    user_id = int(get_jwt_identity())
 
-    # اگر jti نبود، خطای واضح بده
     if not jti:
         return api_error("invalid token payload", 401)
 
     db.session.add(TokenBlocklist(jti=jti, token_type=token_type, user_id=user_id))
     db.session.commit()
 
-    return api_ok(
-        data=None,
-        message="logged out",
-        http_status=200,
-    )
+    return api_ok(data=None, message="logged out", http_status=200)
 
 
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def me():
-    user_id = get_jwt_identity()  # int
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
 
     if not user:
         return api_error("user not found", 404)
 
-    return api_ok(
-        data={"user": user.to_dict()},
-        message="ok",
-        http_status=200,
-    )
+    return api_ok(data={"user": user.to_dict()}, message="ok", http_status=200)

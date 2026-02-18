@@ -1,7 +1,8 @@
 import re
 import psycopg2
 import numpy as np
-from openai import OpenAI
+from google import genai
+from google.genai import types
 from pgvector.psycopg2 import register_vector
 
 from config import Config
@@ -10,27 +11,22 @@ from ..extensions import db
 
 
 # ======================================================
-# تنظیمات کلاینت‌ها
+# تنظیمات
 # ======================================================
 
 DATABASE_URL = Config.SQLALCHEMY_DATABASE_URI
 
-embedding_client = OpenAI(
-    base_url=Config.LIARA_EMBEDDING_BASE_URL,
-    api_key=Config.LIARA_EMBEDDING_API_KEY
-)
+if not Config.GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set")
 
-chat_client = OpenAI(
-    base_url=Config.LIARA_CHAT_BASE_URL,
-    api_key=Config.LIARA_CHAT_API_KEY
-)
+client = genai.Client(api_key=Config.GEMINI_API_KEY)
 
-EMBEDDING_MODEL = Config.EMBEDDING_MODEL
-GPT_MODEL = Config.GPT_MODEL
+CHAT_MODEL = Config.GEMINI_CHAT_MODEL
+EMBEDDING_MODEL = Config.GEMINI_EMBEDDING_MODEL
 
 
 # ======================================================
-# 🎭 Persona (System Prompt)
+# 🎭 Persona
 # ======================================================
 
 SYSTEM_PROMPT = """
@@ -45,20 +41,20 @@ SYSTEM_PROMPT = """
 
 
 # ======================================================
-# توابع کمکی
+# Helpers
 # ======================================================
 
 def keep_only_persian(text: str) -> str:
     return re.sub(r"[^\u0600-\u06FF\u200c\s]", "", text or "")
 
 
-def get_embedding(text: str):
-    resp = embedding_client.embeddings.create(
+def get_embedding(text: str, task_type: str):
+    resp = client.models.embed_content(
         model=EMBEDDING_MODEL,
-        input=text,
-        encoding_format="float"
+        contents=text,
+        config=types.EmbedContentConfig(task_type=task_type),
     )
-    return resp.data[0].embedding
+    return np.array(resp.embeddings[0].values, dtype=float)
 
 
 def cosine_similarity(a, b) -> float:
@@ -71,39 +67,73 @@ def cosine_similarity(a, b) -> float:
     return float(np.dot(a, b) / (na * nb))
 
 
+def clamp_percent(score: float) -> int:
+    try:
+        p = int(round(float(score) * 100))
+    except Exception:
+        p = 0
+    return max(0, min(100, p))
+
+
 def detect_intent(user_text: str) -> str:
-    """
-    تشخیص اینکه کاربر قصد تحلیل رزومه دارد یا چت عادی
-    خروجی فقط: ANALYZE یا CHAT
-    """
     prompt = f"""
-Analyze the user input.
-If they are providing a resume/CV or asking for job recommendations based on their skills, respond with ANALYZE.
-If it's a general question, greeting, or follow-up chat, respond with CHAT.
+ورودی کاربر را تحلیل کن.
+اگر کاربر رزومه/CV داده یا درخواست معرفی شغل بر اساس مهارت‌ها و رزومه دارد: ANALYZE
+اگر گفتگو عمومی/سلام/سوال عمومی/پیگیری گفتگو است: CHAT
 
-User Input: "{user_text}"
+متن کاربر:
+\"\"\"{user_text}\"\"\"
 
-Response (ONLY one word):"""
+فقط یکی از این دو کلمه را برگردان:
+ANALYZE
+CHAT
+""".strip()
 
-    response = chat_client.chat.completions.create(
-        model=GPT_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
+    resp = client.models.generate_content(
+        model=CHAT_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=10,
+            system_instruction=SYSTEM_PROMPT,
+        ),
     )
 
-    raw = (response.choices[0].message.content or "").strip().upper()
-
-    if "ANALYZE" in raw:
-        return "ANALYZE"
-    return "CHAT"
+    raw = (resp.text or "").strip().upper()
+    return "ANALYZE" if "ANALYZE" in raw else "CHAT"
 
 
-def update_chat_summary(chat_id: int, user_id: int | None = None):
+def extract_title(raw_text: str) -> str:
+    lines = (raw_text or "").strip().splitlines()
+    if lines:
+        first = lines[0].strip()
+        if 3 <= len(first) <= 120:
+            return first
+    return "موقعیت شغلی"
+
+
+def extract_requirements(raw_text: str, max_items: int = 6):
+    text = raw_text or ""
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    items = []
+    for l in lines:
+        if l.startswith(("•", "-", "*", "–")):
+            items.append(l.lstrip("•-*– ").strip())
+        if len(items) >= max_items:
+            break
+    return items
+
+
+# ======================================================
+# 🧠 حافظه: خلاصه‌سازی مرحله‌ای
+# ======================================================
+
+def update_chat_summary(chat_id: int, user_id: int | None = None, chunk_limit: int = 18):
     """
-    خلاصه‌سازی مکالمات برای مدیریت حافظه بلندمدت
-
-    نکته امنیتی:
-    اگر user_id داده شود، خلاصه فقط برای چتی آپدیت می‌شود که متعلق به همان user باشد.
+    خلاصه را مرحله‌ای آپدیت می‌کند:
+    - فقط پیام‌های بعد از last_summarized_message_id را می‌گیرد
+    - خلاصه قبلی را به عنوان زمینه می‌دهد
+    - بعد از خلاصه‌سازی، last_summarized_message_id را جلو می‌برد
     """
     q = Chat.query.filter_by(chat_id=chat_id)
     if user_id is not None:
@@ -113,43 +143,81 @@ def update_chat_summary(chat_id: int, user_id: int | None = None):
     if not chat:
         return
 
-    recent_msgs = (
+    last_id = chat.last_summarized_message_id or 0
+
+    new_msgs = (
         Message.query
-        .filter_by(chat_id=chat_id)
-        .order_by(Message.message_id.desc())
-        .limit(10)
+        .filter(Message.chat_id == chat_id, Message.message_id > last_id)
+        .order_by(Message.message_id.asc())
+        .limit(chunk_limit)
         .all()
     )
-    recent_msgs.reverse()
 
-    chat_history = "\n".join(
-        [f"{'User' if m.is_user else 'Bot'}: {m.content}" for m in recent_msgs]
+    if not new_msgs:
+        return
+
+    # متن پیام‌های جدید
+    new_block = "\n".join(
+        [f"{'User' if m.is_user else 'Bot'}: {m.content}" for m in new_msgs]
     )
 
-    prompt = (
-        "خلاصه کوتاه و دقیق مکالمه زیر را به فارسی بنویس "
-        "تا در مراجعات بعدی استفاده شود:\n\n"
-        f"{chat_history}"
+    previous_summary = (chat.summary or "").strip()
+
+    prompt = f"""
+تو باید یک خلاصه‌ی حافظه‌ای کوتاه و دقیق از مکالمه بسازی و همیشه به‌روز نگهش داری.
+
+خلاصه قبلی (اگر وجود دارد):
+\"\"\"{previous_summary}\"\"\"
+
+پیام‌های جدید:
+\"\"\"{new_block}\"\"\"
+
+قواعد:
+- خلاصه نهایی فارسی باشد
+- کوتاه اما شامل نکات مهم، اطلاعات شخصی/ترجیحات کاربر، هدف گفتگو، تصمیم‌ها و درخواست‌های کلیدی باشد
+- اگر خلاصه قبلی درست است، آن را با پیام‌های جدید ادغام و به‌روز کن
+- خروجی فقط خودِ خلاصه باشد
+""".strip()
+
+    resp = client.models.generate_content(
+        model=CHAT_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=220,
+            system_instruction=SYSTEM_PROMPT,
+        ),
     )
 
-    response = chat_client.chat.completions.create(
-        model=GPT_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-
-    chat.summary = (response.choices[0].message.content or "").strip()
+    chat.summary = (resp.text or "").strip()
+    chat.last_summarized_message_id = new_msgs[-1].message_id
     db.session.commit()
 
 
+def maybe_update_chat_summary(chat_id: int, user_id: int | None = None, every_n_messages: int = 10):
+    """
+    هر N پیام یکبار خلاصه را جلو می‌برد.
+    """
+    q = Chat.query.filter_by(chat_id=chat_id)
+    if user_id is not None:
+        q = q.filter_by(user_id=user_id)
+    chat = q.first()
+    if not chat:
+        return
+
+    # تعداد کل پیام‌ها
+    total = Message.query.filter_by(chat_id=chat_id).count()
+    if total % every_n_messages != 0:
+        return
+
+    update_chat_summary(chat_id, user_id=user_id)
+
+
 # ======================================================
-# 🧠 تحلیل رزومه و انتخاب ۳ شغل برتر
+# 🧠 تحلیل رزومه
 # ======================================================
 
 def analyze_resume(user_text: str):
-    """
-    خروجی: chunkهای متنی (string) برای استریم
-    """
     conn = None
     cursor = None
 
@@ -169,7 +237,7 @@ def analyze_resume(user_text: str):
             yield "❌ هیچ آگهی شغلی برای مقایسه یافت نشد."
             return
 
-        resume_embedding = get_embedding(user_text)
+        resume_embedding = get_embedding(user_text, task_type="RETRIEVAL_QUERY")
 
         scored_jobs = []
         for company, url, text, emb in jobs:
@@ -188,28 +256,23 @@ def analyze_resume(user_text: str):
         scored_jobs.sort(key=lambda x: x["score"], reverse=True)
         top_jobs = scored_jobs[:3]
 
-        jobs_with_reviews = []
-        for job in top_jobs:
-            raw_company = (job.get("company") or "").strip()
-            company_name = keep_only_persian(raw_company).strip()
-            query_name = company_name if company_name else raw_company
+        cards = []
+        for idx, job in enumerate(top_jobs, start=1):
+            cards.append({
+                "job_id": idx,
+                "title": extract_title(job.get("text")),
+                "company_name": job.get("company") or None,
+                "location": None,
+                "paycheck": None,
+                "requirements": extract_requirements(job.get("text")),
+                "match_percent": clamp_percent(job.get("score")),
+                "job_url": job.get("url") or None
+            })
 
-            cursor.execute(
-                "SELECT reviews FROM public.companies WHERE name = %s;",
-                (query_name,)
-            )
-            rows = cursor.fetchall()
-
-            if rows:
-                reviews_text = "\n".join([r[0] for r in rows if r and r[0]])
-                job["reviews"] = reviews_text.strip() if reviews_text.strip() else "نظری ثبت نشده است."
-            else:
-                job["reviews"] = "نظری ثبت نشده است."
-
-            jobs_with_reviews.append(job)
+        yield ("jobs", {"items": cards})
 
         jobs_text = ""
-        for i, job in enumerate(jobs_with_reviews, start=1):
+        for i, job in enumerate(top_jobs, start=1):
             jobs_text += f"""
 ==============================
 🔹 شغل شماره {i}
@@ -218,9 +281,6 @@ def analyze_resume(user_text: str):
 لینک: {job['url']}
 درصد تطابق: {job['score'] * 100:.1f}٪
 
-[نظرات کاربران]
-{job['reviews']}
-
 [متن آگهی]
 {job['text']}
 """
@@ -228,29 +288,32 @@ def analyze_resume(user_text: str):
         prompt = f"""
 بر اساس رزومه کاربر، ۳ موقعیت شغلی با بیشترین تطابق انتخاب شده‌اند.
 
+[رزومه کاربر]
+{user_text}
+
+[۳ آگهی منتخب]
 {jobs_text}
 
 گزارش حرفه‌ای شامل:
 1) خلاصه هر آگهی
 2) ارزیابی تطابق رزومه با هر شغل
-3) تحلیل نظرات مثبت و منفی هر شرکت
-4) مقایسه نهایی بین ۳ شغل
-5) پیشنهاد بهترین گزینه برای اقدام به همراه دلیل
+3) مقایسه نهایی بین ۳ شغل
+4) پیشنهاد بهترین گزینه برای اقدام به همراه دلیل
 """.strip()
 
-        stream = chat_client.chat.completions.create(
-            model=GPT_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            stream=True
+        stream = client.models.generate_content_stream(
+            model=CHAT_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=Config.GEMINI_TEMPERATURE,
+                max_output_tokens=Config.GEMINI_MAX_OUTPUT_TOKENS,
+                system_instruction=SYSTEM_PROMPT,
+            ),
         )
 
-        for event in stream:
-            delta = event.choices[0].delta
-            if delta and getattr(delta, "content", None):
-                yield delta.content
+        for chunk in stream:
+            if chunk.text:
+                yield chunk.text
 
     finally:
         try:
@@ -266,18 +329,10 @@ def analyze_resume(user_text: str):
 
 
 # ======================================================
-# 🤖 تولید پاسخ بات (چت ادامه‌دار)
+# 🤖 تولید پاسخ بات (با حافظه + خلاصه)
 # ======================================================
 
 def generate_bot_reply(chat_id: int, user_text: str, user_id: int | None = None):
-    """
-    قرارداد خروجی برای message.py:
-      - اولین yield حتماً: ("intent", "chat|analyze|error")
-      - بعدش: ("content", "<chunk>")...
-
-    نکته امنیتی:
-      - اگر user_id داده شود، چت فقط در صورت مالکیت همان user قابل دسترسی است.
-    """
     q = Chat.query.filter_by(chat_id=chat_id)
     if user_id is not None:
         q = q.filter_by(user_id=user_id)
@@ -292,16 +347,23 @@ def generate_bot_reply(chat_id: int, user_text: str, user_id: int | None = None)
     yield "intent", "analyze" if intent == "ANALYZE" else "chat"
 
     if intent == "ANALYZE":
-        for chunk in analyze_resume(user_text):
-            yield "content", chunk
+        for item in analyze_resume(user_text):
+            if isinstance(item, tuple) and len(item) == 2:
+                yield item[0], item[1]
+            else:
+                yield "content", item
         return
 
-    # مسیر چت عادی با حافظه
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    contents = []
 
+    # خلاصه مکالمات قبلی (حافظه بلندمدت)
     if chat.summary:
-        messages.append({"role": "system", "content": f"خلاصه مکالمات قبلی: {chat.summary}"})
+        contents.append({
+            "role": "user",
+            "parts": [{"text": f"خلاصه مکالمات قبلی: {chat.summary}"}]
+        })
 
+    # حافظه کوتاه‌مدت: ۶ پیام آخر
     recent_messages = (
         Message.query
         .filter_by(chat_id=chat_id)
@@ -312,20 +374,24 @@ def generate_bot_reply(chat_id: int, user_text: str, user_id: int | None = None)
     recent_messages.reverse()
 
     for msg in recent_messages:
-        messages.append({
-            "role": "user" if msg.is_user else "assistant",
-            "content": msg.content
+        contents.append({
+            "role": "user" if msg.is_user else "model",
+            "parts": [{"text": msg.content}]
         })
 
-    messages.append({"role": "user", "content": user_text})
+    # پیام جدید
+    contents.append({"role": "user", "parts": [{"text": user_text}]})
 
-    stream = chat_client.chat.completions.create(
-        model=GPT_MODEL,
-        messages=messages,
-        stream=True
+    stream = client.models.generate_content_stream(
+        model=CHAT_MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            temperature=Config.GEMINI_TEMPERATURE,
+            max_output_tokens=Config.GEMINI_MAX_OUTPUT_TOKENS,
+            system_instruction=SYSTEM_PROMPT,
+        ),
     )
 
-    for event in stream:
-        delta = event.choices[0].delta
-        if delta and getattr(delta, "content", None):
-            yield "content", delta.content
+    for chunk in stream:
+        if chunk.text:
+            yield "content", chunk.text

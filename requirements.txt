@@ -6,7 +6,9 @@ Flask-JWT-Extended==4.6.0
 
 pg8000
 python-dotenv==1.0.1
-OpenAI
+
+google-genai
+
 psycopg2
 numpy
 pgvector

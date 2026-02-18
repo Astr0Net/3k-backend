@@ -53,11 +53,11 @@ def create_app():
     # خطاهای JWT به صورت JSON تمیز
     @jwt.unauthorized_loader
     def jwt_missing_token(reason):
-        return jsonify({"error": "missing or invalid token"}), 401
+        return jsonify({"error": f"missing token: {reason}"}), 401
 
     @jwt.invalid_token_loader
     def jwt_invalid_token(reason):
-        return jsonify({"error": "invalid token"}), 401
+        return jsonify({"error": f"invalid token: {reason}"}), 401
 
     @jwt.expired_token_loader
     def jwt_expired_token(jwt_header, jwt_payload):
