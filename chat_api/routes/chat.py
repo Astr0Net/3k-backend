@@ -1,76 +1,120 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..extensions import db
-from chat_api.models.models import User, Chat, Message
+from chat_api.models.models import Chat
 
 chat_bp = Blueprint("chat", __name__)
 
 
-@chat_bp.route("/users/<int:user_id>/chats", methods=["GET"])
-def get_chats(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "user not found"}), 404
+# -------------------------
+# Response helpers (Standard API Contract)
+# -------------------------
+def api_ok(data=None, message="ok", http_status=200):
+    payload = {
+        "status": http_status,
+        "message": message,
+        "data": data,
+    }
+    return jsonify(payload), http_status
 
-    chats = [c.to_dict() for c in user.chats]
-    return jsonify({"chats": chats}), 200
+
+def api_error(message="error", http_status=400, data=None):
+    payload = {
+        "status": http_status,
+        "error": message,
+        "data": data,
+    }
+    return jsonify(payload), http_status
 
 
-@chat_bp.route("/users/<int:user_id>/chats", methods=["POST"])
-def create_chat(user_id):
+# -------------------------
+# Helpers
+# -------------------------
+def _current_user_id() -> int:
+    # identity باید int باشد (طبق auth.py اصلاح‌شده)
+    return int(get_jwt_identity())
+
+
+def _chat_brief(chat: Chat) -> dict:
     """
-    ساخت یک چت جدید برای کاربر.
-    این روت هیچ بدنه‌ی JSON لازم ندارد و فقط یک چت با عنوان اولیه "New Chat" می‌سازد.
+    داده‌های لازم برای لیست چت‌ها (حداقلی)
     """
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "user not found"}), 404
+    return {
+        "chat_id": chat.chat_id,
+        "title": chat.title,
+    }
 
-    # نیازی به request.get_json نیست؛ تا مطمئن باشیم 400 نمی‌خوریم.
+
+# -------------------------
+# Routes (JWT-based, no user_id in URL)
+# -------------------------
+
+@chat_bp.route("/chats", methods=["GET"])
+@jwt_required()
+def get_chats():
+    user_id = _current_user_id()
+
+    chats = (
+        Chat.query
+        .filter_by(user_id=user_id)
+        .order_by(Chat.chat_id.desc())
+        .all()
+    )
+
+    # فقط داده‌های لازم
+    data = {"chats": [_chat_brief(c) for c in chats]}
+    return api_ok(data=data, message="ok", http_status=200)
+
+
+@chat_bp.route("/chats", methods=["POST"])
+@jwt_required()
+def create_chat():
+    user_id = _current_user_id()
+
+    # طبق پروژه‌ی شما: همیشه New Chat
     chat = Chat(user_id=user_id, title="New Chat")
     db.session.add(chat)
     db.session.commit()
 
-    return jsonify({"message": "chat created", "chat": chat.to_dict()}), 201
+    # فقط چیزهای لازم
+    data = {"chat": _chat_brief(chat)}
+    return api_ok(data=data, message="chat created", http_status=201)
 
-@chat_bp.route("/users/<int:user_id>/chats/<int:chat_id>", methods=["DELETE"])
-def delete_chat(user_id, chat_id):
-    """
-    حذف یک چت متعلق به کاربر.
-    """
-    chat = Chat.query.filter_by(id=chat_id, user_id=user_id).first()
+
+@chat_bp.route("/chats/<int:chat_id>", methods=["DELETE"])
+@jwt_required()
+def delete_chat(chat_id):
+    user_id = _current_user_id()
+
+    chat = Chat.query.filter_by(chat_id=chat_id, user_id=user_id).first()
     if not chat:
-        return jsonify({"error": "chat not found"}), 404
+        return api_error("chat not found", 404)
 
-    # حذف پیام‌ها (اگر مدل Message رابطه cascade ندارد)
-    for msg in chat.messages:
-        db.session.delete(msg)
-
-    # حذف خود چت
     db.session.delete(chat)
     db.session.commit()
 
-    return jsonify({"message": "chat deleted"}), 200
+    return api_ok(data=None, message="chat deleted", http_status=200)
 
-@chat_bp.route("/users/<int:user_id>/chats/<int:chat_id>/title", methods=["PATCH"])
-def update_chat_title(user_id, chat_id):
-    """
-    ویرایش عنوان یک چت.
-    بدنه‌ی درخواست باید شامل فیلد 'title' باشد.
-    """
-    chat = Chat.query.filter_by(id=chat_id, user_id=user_id).first()
+
+@chat_bp.route("/chats/<int:chat_id>/title", methods=["PATCH"])
+@jwt_required()
+def update_chat_title(chat_id):
+    user_id = _current_user_id()
+
+    chat = Chat.query.filter_by(chat_id=chat_id, user_id=user_id).first()
     if not chat:
-        return jsonify({"error": "chat not found"}), 404
+        return api_error("chat not found", 404)
 
     data = request.get_json(silent=True) or {}
+    new_title = (data.get("title") or "").strip()
 
-    new_title = data.get("title")
     if not new_title:
-        return jsonify({"error": "title is required"}), 400
+        return api_error("title is required", 400)
+    if len(new_title) > 60:
+        return api_error("title is too long (max 60 chars)", 400)
 
     chat.title = new_title
     db.session.commit()
 
-    return jsonify({
-        "message": "chat title updated",
-        "chat": chat.to_dict()
-    }), 200
+    data = {"chat": _chat_brief(chat)}
+    return api_ok(data=data, message="chat title updated", http_status=200)

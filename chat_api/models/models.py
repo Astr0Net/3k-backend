@@ -12,10 +12,8 @@ class User(db.Model):
     chats = db.relationship("Chat", back_populates="user", cascade="all, delete-orphan")
 
     def to_dict(self):
-        return {
-            "user_id": self.user_id,
-            "username": self.username,
-        }
+        return {"user_id": self.user_id, "username": self.username}
+
 
 class Chat(db.Model):
     __tablename__ = "chats"
@@ -25,18 +23,13 @@ class Chat(db.Model):
     title = db.Column(db.String(255))
 
     summary = db.Column(db.Text, nullable=True)
-
     last_summarized_message_id = db.Column(db.Integer, nullable=True)
 
     user = db.relationship("User", back_populates="chats")
     messages = db.relationship("Message", back_populates="chat", cascade="all, delete-orphan")
 
     def to_dict(self, include_messages=False):
-        data = {
-            "chat_id": self.chat_id,
-            "user_id": self.user_id,
-            "title": self.title,
-        }
+        data = {"chat_id": self.chat_id, "user_id": self.user_id, "title": self.title}
         if include_messages:
             data["messages"] = [m.to_dict() for m in self.messages]
         return data
@@ -48,7 +41,7 @@ class Message(db.Model):
     message_id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey("chats.chat_id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    time = db.Column(db.String(255))  # طبق دیتابیس تو، ولی بهتره در عمل datetime باشه
+    time = db.Column(db.String(255))
     is_user = db.Column(db.Boolean, nullable=False)
 
     chat = db.relationship("Chat", back_populates="messages")
@@ -65,3 +58,17 @@ class Message(db.Model):
     @staticmethod
     def now_as_string():
         return datetime.utcnow().isoformat()
+
+
+class TokenBlocklist(db.Model):
+    """
+    توکن‌های revoke شده (برای logout و امنیت).
+    با چند worker (gunicorn) هم درست کار می‌کند چون DB محور است.
+    """
+    __tablename__ = "token_blocklist"
+
+    id = db.Column(db.Integer, primary_key=True)
+    jti = db.Column(db.String(36), unique=True, nullable=False, index=True)
+    token_type = db.Column(db.String(10), nullable=False)  # access / refresh
+    user_id = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=True)
+    revoked_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
