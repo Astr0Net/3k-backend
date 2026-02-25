@@ -1,5 +1,4 @@
-import re
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from sqlalchemy.exc import IntegrityError
 from flask_jwt_extended import (
     create_access_token,
@@ -10,58 +9,22 @@ from flask_jwt_extended import (
 )
 
 from ..extensions import db, bcrypt
-from chat_api.models.models import User, TokenBlocklist
+from chat_api.models import User, TokenBlocklist
+
+from .auth_helpers import api_ok, api_error, normalize_username
+from .auth_validators import validate_username, validate_password
+
 
 auth_bp = Blueprint("auth", __name__)
-
-USERNAME_MIN = 3
-USERNAME_MAX = 32
-PASSWORD_MIN = 8
-PASSWORD_MAX = 128
-_username_re = re.compile(r"^[a-z0-9._-]+$")
-
-
-def api_ok(data=None, message="ok", http_status=200):
-    payload = {"status": http_status, "message": message, "data": data}
-    return jsonify(payload), http_status
-
-
-def api_error(message="error", http_status=400, data=None):
-    payload = {"status": http_status, "error": message, "data": data}
-    return jsonify(payload), http_status
-
-
-def _normalize_username(u: str) -> str:
-    return (u or "").strip().lower()
-
-
-def _validate_username(username: str):
-    if not username:
-        return "username is required"
-    if not (USERNAME_MIN <= len(username) <= USERNAME_MAX):
-        return f"username length must be {USERNAME_MIN}-{USERNAME_MAX}"
-    if not _username_re.match(username):
-        return "username contains invalid characters"
-    return None
-
-
-def _validate_password(password: str):
-    if not password:
-        return "password is required"
-    if not (PASSWORD_MIN <= len(password) <= PASSWORD_MAX):
-        return f"password length must be {PASSWORD_MIN}-{PASSWORD_MAX}"
-    if not any(c.isalpha() for c in password) or not any(c.isdigit() for c in password):
-        return "password must contain at least one letter and one digit"
-    return None
 
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
-    username = _normalize_username(data.get("username"))
+    username = normalize_username(data.get("username"))
     password = data.get("password") or ""
 
-    err = _validate_username(username) or _validate_password(password)
+    err = validate_username(username) or validate_password(password)
     if err:
         return api_error(err, 400)
 
@@ -81,18 +44,16 @@ def register():
 @auth_bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
-    username = _normalize_username(data.get("username"))
+    username = normalize_username(data.get("username"))
     password = data.get("password") or ""
 
     if not username or not password:
         return api_error("username and password are required", 400)
 
     user = User.query.filter_by(username=username).first()
-
     if not user or not bcrypt.check_password_hash(user.password, password):
         return api_error("invalid credentials", 401)
 
-    # ✅ identity باید string باشد تا sub در JWT استاندارد باشد
     access_token = create_access_token(identity=str(user.user_id))
     refresh_token = create_refresh_token(identity=str(user.user_id))
 

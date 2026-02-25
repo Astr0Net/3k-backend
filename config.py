@@ -9,7 +9,7 @@ class Config:
     # =========================
     # Flask
     # =========================
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+    SECRET_KEY = os.getenv("SECRET_KEY")
 
     # =========================
     # Database
@@ -20,12 +20,12 @@ class Config:
     # =========================
     # JWT
     # =========================
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
-        minutes=int(os.getenv("JWT_ACCESS_MINUTES", "15"))
+        minutes=int(os.getenv("JWT_ACCESS_MINUTES"))
     )
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
-        days=int(os.getenv("JWT_REFRESH_DAYS", "30"))
+        days=int(os.getenv("JWT_REFRESH_DAYS"))
     )
 
     JWT_TOKEN_LOCATION = ["headers"]
@@ -33,27 +33,34 @@ class Config:
     JWT_HEADER_TYPE = "Bearer"
 
     # =========================
-    # Gemini API
+    # Chat LLM (Qom)
     # =========================
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    LLM_BASE_URL = os.getenv("LLM_BASE_URL")
+    LLM_CHAT_ENDPOINT = os.getenv("LLM_CHAT_ENDPOINT")
+    LLM_API_KEY = os.getenv("LLM_API_KEY") 
+    LLM_MODEL = os.getenv("LLM_MODEL")
+
+    # Generation settings
+    LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE"))
+    LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS"))
+    LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT"))
+
+    @classmethod
+    def llm_chat_url(cls) -> str:
+        """
+        Full URL for chat completions endpoint.
+        Example: https://llm-test.ssl.qom.ac.ir/llm/v1/chat/completions
+        """
+        base = (cls.LLM_BASE_URL or "").rstrip("/")
+        endpoint = (cls.LLM_CHAT_ENDPOINT or "").strip()
+        if not endpoint.startswith("/"):
+            endpoint = "/" + endpoint
+        return base + endpoint
 
     # =========================
-    # Gemini Models
+    # Embedding (Qom)
     # =========================
-    GEMINI_CHAT_MODEL = os.getenv(
-        "GEMINI_CHAT_MODEL",
-        "models/gemini-2.0-flash"
-    )
-
-    GEMINI_EMBEDDING_MODEL = os.getenv(
-        "GEMINI_EMBEDDING_MODEL",
-        "models/gemini-embedding-001"
-    )
-
-    # =========================
-    # Gemini Generation Settings
-    # =========================
-    GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.6"))
-    GEMINI_MAX_OUTPUT_TOKENS = int(
-        os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "1024")
-    )
+    EMBED_BASE_URL = os.getenv("EMBED_BASE_URL")
+    EMBED_MODEL = os.getenv("EMBED_MODEL")
+    EMBED_EXPECTED_DIM = int(os.getenv("EMBED_EXPECTED_DIM"))
+    EMBED_TIMEOUT = int(os.getenv("EMBED_TIMEOUT"))

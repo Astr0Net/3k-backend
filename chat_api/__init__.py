@@ -1,24 +1,30 @@
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+
 from config import Config
 from .extensions import db, bcrypt, jwt
-from .models.models import TokenBlocklist
+from .models import TokenBlocklist
 
 
 def _get_allowed_origins():
     """
     خواندن لیست originهای مجاز از ENV.
     نمونه:
-      CORS_ORIGINS=http://localhost:5173,https://your-frontend.com
+      CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://10.241.248.254:5173
     """
     raw = os.getenv("CORS_ORIGINS", "").strip()
 
-    # اگر تنظیم نکردی، برای dev راحت باشه
+    # اگر تنظیم نکردی، برای dev چند مورد رایج رو باز می‌گذاریم
     if not raw:
-        return ["http://localhost:5173"]
+        return [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://0.0.0.0:5173",
+        ]
 
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    # لیست واقعی از ENV
+    return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
 
 
 def create_app():
@@ -34,13 +40,23 @@ def create_app():
         allow_headers=["Content-Type", "Authorization"],
         expose_headers=["Content-Type"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        max_age=86400,  # cache preflight for 24h
-        supports_credentials=False,  # چون JWT در header می‌فرستی
+        max_age=86400,
+        supports_credentials=False,
     )
 
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
+
+    # ---- Debug endpoint برای چک کردن CORS/Origin ----
+    @app.get("/api/_debug/cors")
+    def debug_cors():
+        return jsonify(
+            {
+                "allowed_origins": allowed_origins,
+                "env_CORS_ORIGINS": os.getenv("CORS_ORIGINS"),
+            }
+        )
 
     # اگر توکن revoke شده بود، از اینجا بلاک میشه
     @jwt.token_in_blocklist_loader
@@ -48,7 +64,12 @@ def create_app():
         jti = jwt_payload.get("jti")
         if not jti:
             return True
-        return db.session.query(TokenBlocklist.id).filter_by(jti=jti).scalar() is not None
+        return (
+            db.session.query(TokenBlocklist.id)
+            .filter_by(jti=jti)
+            .scalar()
+            is not None
+        )
 
     # خطاهای JWT به صورت JSON تمیز
     @jwt.unauthorized_loader
