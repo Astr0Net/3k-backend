@@ -20,15 +20,20 @@ def current_user_id() -> int:
 
 
 def chat_brief(chat: Chat) -> dict:
-    return {"chat_id": chat.chat_id, "title": chat.title}
+    return {
+        "chat_id": chat.chat_id,
+        "title": chat.title,
+        "created_at": chat.created_at.isoformat() if chat.created_at else None,
+        "updated_at": chat.updated_at.isoformat() if getattr(chat, "updated_at", None) else None,
+    }
 
 
 def message_dto(m: Message) -> dict:
     return {
         "message_id": m.message_id,
         "content": m.content,
-        "time": m.time,
-        "role": "user" if m.is_user else "assistant",
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+        "role": m.role,
     }
 
 

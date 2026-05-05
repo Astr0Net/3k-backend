@@ -1,10 +1,8 @@
 from chat_api.models import Chat, Message
-from ..extensions import db
 
 from .qom_llm import qom_chat, chunk_text
 from .intent_classifier import detect_intent
 from .resume_report import analyze_resume_stream
-from .memory_summary import maybe_update_chat_summary
 
 
 SYSTEM_PROMPT = """
@@ -41,38 +39,48 @@ def generate_bot_reply(chat_id: int, user_text: str, user_id: int | None = None)
                 yield "content", item
         return
 
-    # ---- CHAT MODE ----
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # حافظه بلندمدت
     if chat.summary:
-        messages.append({"role": "system", "content": f"خلاصه مکالمات قبلی: {chat.summary}"})
+        messages.append({
+            "role": "system",
+            "content": f"خلاصه مکالمات قبلی: {chat.summary}"
+        })
 
-    # حافظه کوتاه‌مدت: ۶ پیام آخر
     recent_messages = (
         Message.query
         .filter_by(chat_id=chat_id)
-        .order_by(Message.message_id.desc())
+        .order_by(Message.created_at.desc())
         .limit(6)
         .all()
     )
     recent_messages.reverse()
 
     for msg in recent_messages:
+        role = msg.role if msg.role in {"user", "assistant", "system"} else ("user" if getattr(msg, "is_user", False) else "assistant")
+        content = (msg.content or "").strip()
+
+        if not content:
+            continue
+
         messages.append({
-            "role": "user" if msg.is_user else "assistant",
-            "content": msg.content
+            "role": role,
+            "content": content
         })
 
-    messages.append({"role": "user", "content": user_text})
+    cleaned_user_text = (user_text or "").strip()
+    if not cleaned_user_text:
+        yield "content", "❌ پیام کاربر خالی است."
+        return
+
+    messages.append({"role": "user", "content": cleaned_user_text})
 
     reply = qom_chat(messages)
 
-    for part in chunk_text(reply, chunk_size=220):
-        yield "content", part
+    if not reply or not str(reply).strip():
+        yield "content", "❌ پاسخی از مدل دریافت نشد."
+        return
 
-    # اختیاری: هر ۱۰ پیام خلاصه را آپدیت کن
-    try:
-        maybe_update_chat_summary(chat_id, user_id=user_id, every_n_messages=10)
-    except Exception:
-        pass
+    for part in chunk_text(str(reply).strip(), chunk_size=220):
+        if part:
+            yield "content", part

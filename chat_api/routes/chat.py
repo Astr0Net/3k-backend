@@ -1,14 +1,13 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+
 from ..extensions import db
 from chat_api.models import Chat
+
 
 chat_bp = Blueprint("chat", __name__)
 
 
-# -------------------------
-# Response helpers (Standard API Contract)
-# -------------------------
 def api_ok(data=None, message="ok", http_status=200):
     payload = {
         "status": http_status,
@@ -27,27 +26,18 @@ def api_error(message="error", http_status=400, data=None):
     return jsonify(payload), http_status
 
 
-# -------------------------
-# Helpers
-# -------------------------
 def _current_user_id() -> int:
-    # identity باید int باشد (طبق auth.py اصلاح‌شده)
     return int(get_jwt_identity())
 
 
 def _chat_brief(chat: Chat) -> dict:
-    """
-    داده‌های لازم برای لیست چت‌ها (حداقلی)
-    """
     return {
         "chat_id": chat.chat_id,
         "title": chat.title,
+        "created_at": chat.created_at.isoformat() if chat.created_at else None,
+        "updated_at": chat.updated_at.isoformat() if getattr(chat, "updated_at", None) else None,
     }
 
-
-# -------------------------
-# Routes (JWT-based, no user_id in URL)
-# -------------------------
 
 @chat_bp.route("/chats", methods=["GET"])
 @jwt_required()
@@ -55,13 +45,12 @@ def get_chats():
     user_id = _current_user_id()
 
     chats = (
-        Chat.query
-        .filter_by(user_id=user_id)
-        .order_by(Chat.chat_id.desc())
+        db.session.query(Chat)
+        .filter(Chat.user_id == user_id)
+        .order_by(Chat.updated_at.desc(), Chat.chat_id.desc())
         .all()
     )
 
-    # فقط داده‌های لازم
     data = {"chats": [_chat_brief(c) for c in chats]}
     return api_ok(data=data, message="ok", http_status=200)
 
@@ -71,12 +60,10 @@ def get_chats():
 def create_chat():
     user_id = _current_user_id()
 
-    # طبق پروژه‌ی شما: همیشه New Chat
     chat = Chat(user_id=user_id, title="New Chat")
     db.session.add(chat)
     db.session.commit()
 
-    # فقط چیزهای لازم
     data = {"chat": _chat_brief(chat)}
     return api_ok(data=data, message="chat created", http_status=201)
 
@@ -86,7 +73,11 @@ def create_chat():
 def delete_chat(chat_id):
     user_id = _current_user_id()
 
-    chat = Chat.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+    chat = (
+        db.session.query(Chat)
+        .filter(Chat.chat_id == chat_id, Chat.user_id == user_id)
+        .first()
+    )
     if not chat:
         return api_error("chat not found", 404)
 
@@ -101,7 +92,11 @@ def delete_chat(chat_id):
 def update_chat_title(chat_id):
     user_id = _current_user_id()
 
-    chat = Chat.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+    chat = (
+        db.session.query(Chat)
+        .filter(Chat.chat_id == chat_id, Chat.user_id == user_id)
+        .first()
+    )
     if not chat:
         return api_error("chat not found", 404)
 

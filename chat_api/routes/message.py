@@ -11,6 +11,7 @@ from .message_helpers import (
     chat_brief, message_dto,
 )
 from .message_stream import stream_bot_reply
+from .static_mock import stream_static_reply #test
 
 
 message_bp = Blueprint("message", __name__)
@@ -27,7 +28,7 @@ def get_messages(chat_id):
     messages = (
         Message.query
         .filter_by(chat_id=chat_id)
-        .order_by(Message.message_id.asc())
+        .order_by(Message.created_at.asc())
         .all()
     )
 
@@ -48,16 +49,13 @@ def create_message(chat_id):
     if not content:
         return api_error("content is required", 400)
 
-    # ذخیره پیام کاربر
     user_msg = Message(
         chat_id=chat_id,
         content=content,
-        time=Message.now_as_string(),
-        is_user=True,
+        role="user",
     )
     db.session.add(user_msg)
 
-    # عنوان اگر چت جدید
     title_changed = False
     if not chat.title or chat.title in ("New Chat", "چت جدید"):
         new_title = generate_chat_title(content)
@@ -66,6 +64,15 @@ def create_message(chat_id):
             title_changed = True
 
     db.session.commit()
+
+    return Response(
+        stream_with_context(stream_static_reply(chat, user_msg, content, user_id, title_changed)),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
     return Response(
         stream_with_context(stream_bot_reply(chat, user_msg, content, user_id, title_changed)),

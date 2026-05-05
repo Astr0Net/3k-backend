@@ -22,14 +22,16 @@ def update_chat_summary(chat_id: int, user_id: int | None = None, chunk_limit: i
     new_msgs = (
         Message.query
         .filter(Message.chat_id == chat_id, Message.message_id > last_id)
-        .order_by(Message.message_id.asc())
+        .order_by(Message.created_at.asc())
         .limit(chunk_limit)
         .all()
     )
     if not new_msgs:
         return
 
-    new_block = "\n".join([f"{'User' if m.is_user else 'Bot'}: {m.content}" for m in new_msgs])
+    new_block = "\n".join(
+        [f"{m.role}: {m.content}" for m in new_msgs]
+    )
     previous_summary = (chat.summary or "").strip()
 
     prompt = f"""
@@ -48,8 +50,10 @@ def update_chat_summary(chat_id: int, user_id: int | None = None, chunk_limit: i
 
     try:
         summary = qom_chat(
-            [{"role": "system", "content": SYSTEM_PROMPT},
-             {"role": "user", "content": prompt}],
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0,
             max_tokens=260
         )
@@ -75,4 +79,3 @@ def maybe_update_chat_summary(chat_id: int, user_id: int | None = None, every_n_
         return
 
     update_chat_summary(chat_id, user_id=user_id)
-    

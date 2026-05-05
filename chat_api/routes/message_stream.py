@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from chat_api.models import Message
 from ..extensions import db
 
@@ -20,11 +22,14 @@ def stream_bot_reply(chat, user_msg, user_text: str, user_id: int, title_changed
     try:
         reply_gen = generate_bot_reply(chat.chat_id, user_text, user_id=user_id)
 
-        # اولین yield باید intent باشد
         try:
             first = next(reply_gen)
         except StopIteration:
             yield sse("error", {"message": "empty response from bot"})
+            return
+
+        if not isinstance(first, tuple) or len(first) != 2:
+            yield sse("error", {"message": "protocol error: invalid first yield"})
             return
 
         tag, intent_type = first
@@ -39,24 +44,34 @@ def stream_bot_reply(chat, user_msg, user_text: str, user_id: int, title_changed
             "title_changed": title_changed,
         })
 
-        for tag, chunk in reply_gen:
+        for item in reply_gen:
+            if not isinstance(item, tuple) or len(item) != 2:
+                continue
+
+            tag, chunk = item
+
             if tag == "jobs" and chunk:
                 yield sse("jobs", chunk)
             elif tag == "content" and chunk:
                 full_text += chunk
                 yield sse("content", {"delta": chunk})
 
-        # ذخیره پیام بات
+        if not full_text.strip():
+            yield sse("error", {"message": "empty bot content"})
+            return
+
         bot_msg = Message(
             chat_id=chat.chat_id,
-            content=full_text,
-            time=Message.now_as_string(),
-            is_user=False,
+            content=full_text.strip(),
+            role="assistant",
         )
         db.session.add(bot_msg)
+
+        if hasattr(chat, "updated_at"):
+            chat.updated_at = datetime.now(timezone.utc)
+
         db.session.commit()
 
-        # خلاصه‌سازی (اختیاری)
         try:
             maybe_update_chat_summary(chat.chat_id, user_id=user_id, every_n_messages=10)
         except Exception:

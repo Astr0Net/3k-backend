@@ -6,4 +6,4 @@ load_dotenv()
 api = Blueprint('api', __name__)
 
 # ایمپورت کردن فایل‌های مربوط به مسیرها (auth.py و chat.py)
-from . import auth, chat, message
+from . import auth, chat, message, landing
