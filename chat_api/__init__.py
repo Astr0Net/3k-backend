@@ -94,12 +94,14 @@ def create_app():
     from .routes.message import message_bp
     from .routes.landing import landing_bp
     from .routes.admin import admin_bp
+    from.routes.resume import resume_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(chat_bp, url_prefix="/api")
     app.register_blueprint(message_bp, url_prefix="/api")
     app.register_blueprint(landing_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api')
+    app.register_blueprint(resume_bp, url_prefix='/api')
 
     # ساخت جداول
     with app.app_context():

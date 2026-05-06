@@ -5,7 +5,7 @@ from ..extensions import db
 class Chat(db.Model):
     __tablename__ = "chats"
 
-    chat_id = db.Column(db.Integer, primary_key=True)
+    chat_id = db.Column(db.BigInteger, primary_key=True)
 
     user_id = db.Column(
         db.Integer,
