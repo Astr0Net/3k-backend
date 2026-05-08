@@ -17,4 +17,5 @@ class Job(db.Model):
 
     raw_text = db.Column(db.Text, nullable=False)
 
-    embedding = db.Column(Vector(1536), nullable=True)
+    embedding = db.Column(db.Text, nullable=True) #for test in local
+    # embedding = db.Column(Vector(1536), nullable=True)

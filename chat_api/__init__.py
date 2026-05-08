@@ -1,6 +1,7 @@
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+from flasgger import Swagger
 
 from config import Config
 from .extensions import db, bcrypt, jwt
@@ -43,6 +44,9 @@ def create_app():
         max_age=86400,
         supports_credentials=False,
     )
+
+    # ✅ Swagger / Flasgger
+    Swagger(app)
 
     db.init_app(app)
     bcrypt.init_app(app)
@@ -94,17 +98,27 @@ def create_app():
     from .routes.message import message_bp
     from .routes.landing import landing_bp
     from .routes.admin import admin_bp
-    from.routes.resume import resume_bp
+    from .routes.resume import resume_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(chat_bp, url_prefix="/api")
     app.register_blueprint(message_bp, url_prefix="/api")
-    app.register_blueprint(landing_bp, url_prefix='/api')
-    app.register_blueprint(admin_bp, url_prefix='/api')
-    app.register_blueprint(resume_bp, url_prefix='/api')
+    app.register_blueprint(landing_bp, url_prefix="/api")
+    app.register_blueprint(admin_bp, url_prefix="/api")
+    app.register_blueprint(resume_bp, url_prefix="/api")
+    # @app.route("/ping")
+    # def ping():
+    #     """
+    #     Ping test
+    #     ---
+    #     responses:
+    #     200:
+    #         description: pong
+    #     """
+    #     return "pong"
 
     # ساخت جداول
-    with app.app_context():
-        db.create_all()
+    # with app.app_context():
+    #     db.create_all()
 
     return app

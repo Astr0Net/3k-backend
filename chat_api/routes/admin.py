@@ -63,6 +63,88 @@ def _is_admin() -> bool:
 @admin_bp.route("/stats", methods=["GET"])
 @jwt_required()
 def get_dashboard_stats():
+    """
+    Get admin dashboard statistics
+    ---
+    tags:
+      - Admin
+    summary: Get overall platform statistics (admin only)
+    description: >
+      Returns high-level statistics about the platform, including
+      total users, jobs, chats, and messages.
+      This endpoint is restricted to admin users and requires a valid JWT token.
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Admin statistics retrieved successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 200
+            message:
+              type: string
+              example: "admin stats retrieved"
+            data:
+              type: object
+              properties:
+                total_users:
+                  type: integer
+                  example: 42
+                total_jobs:
+                  type: integer
+                  example: 15
+                total_chats:
+                  type: integer
+                  example: 120
+                total_messages:
+                  type: integer
+                  example: 845
+      401:
+        description: Missing or invalid JWT token
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 401
+            error:
+              type: string
+              example: "missing token: Authorization header is expected"
+            data:
+              type: object
+              nullable: true
+      403:
+        description: Access denied (user is not admin)
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 403
+            error:
+              type: string
+              example: "access denied"
+            data:
+              type: object
+              nullable: true
+      500:
+        description: Internal server error while fetching stats
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 500
+            error:
+              type: string
+              example: "failed to fetch stats"
+            data:
+              type: object
+              nullable: true
+    """
     if not _is_admin():
         return api_error("access denied", http_status=403)
 

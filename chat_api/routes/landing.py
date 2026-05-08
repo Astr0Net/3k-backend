@@ -34,6 +34,60 @@ def api_error(message="error", http_status=400, data=None):
 # -------------------------
 @landing_bp.route("/landing", methods=["GET"])
 def get_landing_data():
+    """
+    Get landing page data
+    ---
+    tags:
+      - Landing
+    summary: Retrieve landing page content and platform statistics
+    description: Returns localized landing page content along with platform-wide statistics,
+      including total users, jobs, chats, and messages.
+    responses:
+      200:
+        description: Landing data retrieved successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: integer
+              example: 200
+            message:
+              type: string
+              example: landing data retrieved
+            data:
+              type: object
+              properties:
+                hero:
+                  type: object
+                problem_section:
+                  type: object
+                solution_section:
+                  type: object
+                features_section:
+                  type: object
+                how_it_works:
+                  type: object
+                stats:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          label:
+                            type: string
+                          value:
+                            type: integer
+                final_cta:
+                  type: object
+      500:
+        description: Failed to fetch landing data
+    """
     try:
         stats = {
             "total_users": db.session.query(func.count(User.user_id)).scalar() or 0,
