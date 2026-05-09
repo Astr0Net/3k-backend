@@ -106,19 +106,9 @@ def create_app():
     app.register_blueprint(landing_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(resume_bp, url_prefix="/api")
-    # @app.route("/ping")
-    # def ping():
-    #     """
-    #     Ping test
-    #     ---
-    #     responses:
-    #     200:
-    #         description: pong
-    #     """
-    #     return "pong"
 
     # ساخت جداول
-    # with app.app_context():
-    #     db.create_all()
+    with app.app_context():
+        db.create_all()
 
     return app

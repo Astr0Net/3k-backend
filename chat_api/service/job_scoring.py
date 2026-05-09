@@ -3,7 +3,7 @@ from pgvector.psycopg2 import register_vector
 from config import Config
 
 from .embeddings import get_embedding, cosine_similarity, clamp_percent
-from .requirements_utils import normalize_requirements
+from ..utils.requirements_utils import normalize_requirements
 from .company_reviews import clean_company_name, format_reviews_for_prompt
 
 

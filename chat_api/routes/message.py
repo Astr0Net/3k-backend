@@ -4,17 +4,13 @@ from flask_jwt_extended import jwt_required
 from ..extensions import db
 from chat_api.models import Message
 
-from .title_gen import generate_chat_title
-from .message_helpers import (
-    api_ok,
-    api_error,
-    current_user_id,
-    get_chat_if_owner,
-    chat_brief,
-    message_dto,
-)
-from .message_stream import stream_bot_reply
-from .static_mock import stream_static_reply  # test
+from ..service.title_gen import generate_chat_title
+from ..service.message_stream import stream_bot_reply
+from ..service.static_mock import stream_static_reply  # test
+
+from ..utils.chat_utils import chat_brief, current_user_id, get_chat_if_owner
+from ..utils.response_utils import api_ok, api_error
+from ..utils.message_utils import message_dto
 
 
 message_bp = Blueprint("message", __name__)
@@ -239,9 +235,9 @@ def create_message(chat_id):
     # فقط stream_static_reply رو با stream_bot_reply عوض کن.
     return Response(
         stream_with_context(
-            stream_static_reply(chat, user_msg, content, user_id, title_changed)
+            # stream_static_reply(chat, user_msg, content, user_id, title_changed)
             # در صورت نیاز:
-            # stream_bot_reply(chat, user_msg, content, user_id, title_changed)
+            stream_bot_reply(chat, user_msg, content, user_id, title_changed)
         ),
         mimetype="text/event-stream",
         headers={

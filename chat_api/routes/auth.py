@@ -11,8 +11,8 @@ from flask_jwt_extended import (
 from ..extensions import db, bcrypt
 from chat_api.models import User, TokenBlocklist
 
-from .auth_helpers import api_ok, api_error, normalize_username
-from .auth_validators import validate_username, validate_password
+from ..utils.response_utils import api_ok, api_error, normalize_username
+from ..service.auth_validators import validate_username, validate_password
 
 
 auth_bp = Blueprint("auth", __name__)

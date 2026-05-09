@@ -9,7 +9,7 @@ class Resume(db.Model):
 
     user_id = db.Column(
         db.Integer,
-        db.ForeignKey("user.id", ondelete="CASCADE"),
+        db.ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -30,7 +30,7 @@ class Resume(db.Model):
         nullable=False
     )
 
-    user = db.relationship("User", backref="resumes")
+    user = db.relationship("Users", backref="resumes")
 
     def __repr__(self):
         return f"<Resume {self.id} - {self.title}>"

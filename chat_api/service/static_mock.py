@@ -1,7 +1,7 @@
 import json
 from chat_api.models import Message
 from ..extensions import db
-from .message_helpers import sse, chat_brief
+from ..utils.message_utils import sse, chat_brief
 
 STATIC_BOT_TEXT = (
     "گزارش تست سامانه پیشنهاد شغل\n"

@@ -5,28 +5,9 @@ from sqlalchemy import func
 from ..extensions import db
 from chat_api.models import User, Job, Chat, Message
 
+from ..utils.response_utils import api_ok, api_error
+
 landing_bp = Blueprint("landing", __name__, url_prefix="/api")
-
-
-# -------------------------
-# Response helpers (Standard API Contract)
-# -------------------------
-def api_ok(data=None, message="ok", http_status=200):
-    payload = {
-        "status": http_status,
-        "message": message,
-        "data": data,
-    }
-    return jsonify(payload), http_status
-
-
-def api_error(message="error", http_status=400, data=None):
-    payload = {
-        "status": http_status,
-        "error": message,
-        "data": data,
-    }
-    return jsonify(payload), http_status
 
 
 # -------------------------

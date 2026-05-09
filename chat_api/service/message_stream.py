@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from chat_api.models import Message
 from ..extensions import db
 
-from .message_helpers import sse, chat_brief
+from ..utils.message_utils import sse, chat_brief
 from .botMessage import generate_bot_reply
 from .memory_summary import maybe_update_chat_summary
 
