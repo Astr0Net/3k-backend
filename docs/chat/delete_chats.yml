@@ -1,0 +1,32 @@
+Delete chat
+---
+tags:
+  - Chat
+summary: Delete a chat owned by the authenticated user
+security:
+  - BearerAuth: []
+parameters:
+  - name: chat_id
+    in: path
+    required: true
+    type: integer
+    description: ID of the chat to delete
+responses:
+  200:
+    description: Chat deleted successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: chat deleted
+        data:
+          type: object
+          nullable: true
+  404:
+    description: Chat not found
+  401:
+    description: Missing or invalid JWT token

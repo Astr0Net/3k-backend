@@ -64,3 +64,5 @@ class Config:
     EMBED_MODEL = os.getenv("EMBED_MODEL")
     EMBED_EXPECTED_DIM = int(os.getenv("EMBED_EXPECTED_DIM"))
     EMBED_TIMEOUT = int(os.getenv("EMBED_TIMEOUT"))
+
+    

@@ -1,0 +1,36 @@
+Import resume content
+---
+tags:
+  - Resume
+summary: Get resume content for import
+description: Returns only the content of a resume owned by the authenticated user.
+security:
+  - BearerAuth: []
+parameters:
+  - in: path
+    name: resume_id
+    type: integer
+    required: true
+    description: Resume ID
+responses:
+  200:
+    description: Resume content retrieved successfully
+    schema:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            content:
+              type: string
+              example: "متن کامل رزومه"
+  404:
+    description: Resume not found
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "resume not found"
+  401:
+    description: Missing or invalid JWT token

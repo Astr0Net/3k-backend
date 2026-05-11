@@ -15,6 +15,20 @@ class User(db.Model):
         index=True
     )
 
+    email = db.Column(
+        db.String(255),
+        unique=True,
+        nullable=True,
+        index=True
+    )
+
+    phone_number = db.Column(
+        db.String(20),
+        unique=True,
+        nullable=True,
+        index=True
+    )
+
     password_hash = db.Column(
         db.String(255),
         nullable=False
@@ -52,6 +66,8 @@ class User(db.Model):
         return {
             "user_id": self.user_id,
             "username": self.username,
+            "email": self.email,
+            "phone_number": self.phone_number,
             "role": self.role,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None

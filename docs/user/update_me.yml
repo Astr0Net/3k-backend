@@ -1,0 +1,39 @@
+Update authenticated user's profile information.
+
+---
+tags:
+  - Users
+summary: Update authenticated user profile
+description: >
+  Allows updating username, email, and phone number.
+  All fields are optional but must pass validation.
+  Uniqueness constraints are enforced.
+
+security:
+  - BearerAuth: []
+
+parameters:
+  - in: body
+    name: body
+    schema:
+      type: object
+      properties:
+        username:
+          type: string
+          example: mohammad_new
+        email:
+          type: string
+          example: example@gmail.com
+        phone_number:
+          type: string
+          example: +989123456789
+
+responses:
+  200:
+    description: Profile updated successfully
+  400:
+    description: Validation error
+  404:
+    description: User not found
+  409:
+    description: Duplicate username/email/phone

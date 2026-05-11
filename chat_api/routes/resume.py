@@ -3,7 +3,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from chat_api.extensions import db
 from chat_api.models.resume import Resume
-
+from flasgger import swag_from
+from chat_api.docs_path import doc
 resume_bp = Blueprint("resume", __name__, url_prefix="/resumes")
 
 
@@ -11,72 +12,11 @@ resume_bp = Blueprint("resume", __name__, url_prefix="/resumes")
 # create resume
 # -------------------------
 @resume_bp.route("/", methods=["POST"])
+@swag_from(doc("resume", "create_resume.yml"))
 @jwt_required()
 def create_resume():
     """
-    Create resume
-    ---
-    tags:
-      - Resume
-    summary: Create a new resume for the authenticated user
-    description: Creates a new resume with a title and content for the authenticated user.
-    security:
-      - BearerAuth: []
-    consumes:
-      - application/json
-    parameters:
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          required:
-            - title
-            - content
-          properties:
-            title:
-              type: string
-              example: "رزومه برنامه نویس بک اند"
-            content:
-              type: string
-              example: "تجربه 3 سال برنامه نویسی پایتون و Flask"
-    responses:
-      201:
-        description: Resume created successfully
-        schema:
-          type: object
-          properties:
-            message:
-              type: string
-              example: "resume created successfully"
-            data:
-              type: object
-              properties:
-                id:
-                  type: integer
-                  example: 1
-                title:
-                  type: string
-                  example: "رزومه برنامه نویس بک اند"
-                content:
-                  type: string
-                  example: "تجربه 3 سال برنامه نویسی پایتون و Flask"
-                created_at:
-                  type: string
-                  example: "2026-05-08T15:00:00"
-                updated_at:
-                  type: string
-                  example: "2026-05-08T15:00:00"
-      400:
-        description: Validation error
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "title is required"
-      401:
-        description: Missing or invalid JWT token
+    
     """
     user_id = get_jwt_identity()
     data = request.get_json() or {}
@@ -111,42 +51,11 @@ def create_resume():
 # list resumes
 # -------------------------
 @resume_bp.route("/", methods=["GET"])
+@swag_from(doc("resume", "list_resumes.yml"))
 @jwt_required()
 def list_resumes():
     """
-    List resumes
-    ---
-    tags:
-      - Resume
-    summary: List all resumes of the authenticated user
-    description: Returns all resumes owned by the authenticated user ordered by updated time descending.
-    security:
-      - BearerAuth: []
-    responses:
-      200:
-        description: List of resumes
-        schema:
-          type: object
-          properties:
-            data:
-              type: array
-              items:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    example: 1
-                  title:
-                    type: string
-                    example: "رزومه برنامه نویس بک اند"
-                  created_at:
-                    type: string
-                    example: "2026-05-08T15:00:00"
-                  updated_at:
-                    type: string
-                    example: "2026-05-08T15:00:00"
-      401:
-        description: Missing or invalid JWT token
+   
     """
     user_id = get_jwt_identity()
 
@@ -174,57 +83,11 @@ def list_resumes():
 # get single resume
 # -------------------------
 @resume_bp.route("/<int:resume_id>", methods=["GET"])
+@swag_from(doc("resume", "get_resume.yml"))
 @jwt_required()
 def get_resume(resume_id):
     """
-    Get single resume
-    ---
-    tags:
-      - Resume
-    summary: Get a specific resume by ID
-    description: Returns a single resume owned by the authenticated user.
-    security:
-      - BearerAuth: []
-    parameters:
-      - in: path
-        name: resume_id
-        type: integer
-        required: true
-        description: Resume ID
-    responses:
-      200:
-        description: Resume retrieved successfully
-        schema:
-          type: object
-          properties:
-            data:
-              type: object
-              properties:
-                id:
-                  type: integer
-                  example: 1
-                title:
-                  type: string
-                  example: "رزومه برنامه نویس بک اند"
-                content:
-                  type: string
-                  example: "محتوای رزومه"
-                created_at:
-                  type: string
-                  example: "2026-05-08T15:00:00"
-                updated_at:
-                  type: string
-                  example: "2026-05-08T15:00:00"
-      404:
-        description: Resume not found
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "resume not found"
-      401:
-        description: Missing or invalid JWT token
+    
     """
     user_id = get_jwt_identity()
 
@@ -248,82 +111,11 @@ def get_resume(resume_id):
 # update resume
 # -------------------------
 @resume_bp.route("/<int:resume_id>", methods=["PUT", "PATCH"])
+@swag_from(doc("resume", "update_resume.yml"))
 @jwt_required()
 def update_resume(resume_id):
     """
-    Update resume
-    ---
-    tags:
-      - Resume
-    summary: Update an existing resume
-    description: Updates the title or content of a resume owned by the authenticated user.
-    security:
-      - BearerAuth: []
-    consumes:
-      - application/json
-    parameters:
-      - in: path
-        name: resume_id
-        type: integer
-        required: true
-        description: Resume ID
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          properties:
-            title:
-              type: string
-              example: "رزومه به روز شده"
-            content:
-              type: string
-              example: "محتوای جدید رزومه"
-    responses:
-      200:
-        description: Resume updated successfully
-        schema:
-          type: object
-          properties:
-            message:
-              type: string
-              example: "resume updated successfully"
-            data:
-              type: object
-              properties:
-                id:
-                  type: integer
-                  example: 1
-                title:
-                  type: string
-                  example: "رزومه به روز شده"
-                content:
-                  type: string
-                  example: "محتوای جدید رزومه"
-                created_at:
-                  type: string
-                  example: "2026-05-08T15:00:00"
-                updated_at:
-                  type: string
-                  example: "2026-05-08T15:00:00"
-      400:
-        description: Validation error
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "title cannot be empty"
-      404:
-        description: Resume not found
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "resume not found"
-      401:
-        description: Missing or invalid JWT token
+    
     """
     user_id = get_jwt_identity()
     data = request.get_json() or {}
@@ -363,42 +155,11 @@ def update_resume(resume_id):
 # delete resume
 # -------------------------
 @resume_bp.route("/<int:resume_id>", methods=["DELETE"])
+@swag_from(doc("resume", "delete_resume.yml"))
 @jwt_required()
 def delete_resume(resume_id):
     """
-    Delete resume
-    ---
-    tags:
-      - Resume
-    summary: Delete a resume
-    description: Deletes a resume owned by the authenticated user.
-    security:
-      - BearerAuth: []
-    parameters:
-      - in: path
-        name: resume_id
-        type: integer
-        required: true
-        description: Resume ID
-    responses:
-      200:
-        description: Resume deleted successfully
-        schema:
-          type: object
-          properties:
-            message:
-              type: string
-              example: "resume deleted successfully"
-      404:
-        description: Resume not found
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "resume not found"
-      401:
-        description: Missing or invalid JWT token
+   
     """
     user_id = get_jwt_identity()
 
@@ -417,45 +178,11 @@ def delete_resume(resume_id):
 # import resume content
 # -------------------------
 @resume_bp.route("/<int:resume_id>/import", methods=["GET"])
+@swag_from(doc("resume", "import_resume_content.yml"))
 @jwt_required()
 def import_resume_content(resume_id):
     """
-    Import resume content
-    ---
-    tags:
-      - Resume
-    summary: Get resume content for import
-    description: Returns only the content of a resume owned by the authenticated user.
-    security:
-      - BearerAuth: []
-    parameters:
-      - in: path
-        name: resume_id
-        type: integer
-        required: true
-        description: Resume ID
-    responses:
-      200:
-        description: Resume content retrieved successfully
-        schema:
-          type: object
-          properties:
-            data:
-              type: object
-              properties:
-                content:
-                  type: string
-                  example: "متن کامل رزومه"
-      404:
-        description: Resume not found
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "resume not found"
-      401:
-        description: Missing or invalid JWT token
+    
     """
     user_id = get_jwt_identity()
 

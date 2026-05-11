@@ -1,0 +1,28 @@
+Refresh access token
+---
+tags:
+  - Auth
+summary: Generate new access token using refresh token
+security:
+  - BearerAuth: []
+responses:
+  200:
+    description: Token refreshed
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+          example: token refreshed
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            token_type:
+              type: string
+              example: Bearer
+  401:
+    description: Invalid or missing refresh token

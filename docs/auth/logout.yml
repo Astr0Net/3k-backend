@@ -1,0 +1,23 @@
+Logout user
+---
+tags:
+  - Auth
+summary: Invalidate the current JWT token
+security:
+  - BearerAuth: []
+responses:
+  200:
+    description: Logged out successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+          example: logged out
+        data:
+          type: object
+          nullable: true
+  401:
+    description: Invalid token payload

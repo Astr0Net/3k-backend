@@ -1,0 +1,41 @@
+Get user chats
+---
+tags:
+  - Chat
+summary: Get all chats for the authenticated user
+security:
+  - BearerAuth: []
+responses:
+  200:
+    description: List of user chats
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: ok
+        data:
+          type: object
+          properties:
+            chats:
+              type: array
+              items:
+                type: object
+                properties:
+                  chat_id:
+                    type: integer
+                    example: 1
+                  title:
+                    type: string
+                    example: New Chat
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+  401:
+    description: Missing or invalid JWT token

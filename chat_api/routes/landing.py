@@ -6,7 +6,8 @@ from ..extensions import db
 from chat_api.models import User, Job, Chat, Message
 
 from ..utils.response_utils import api_ok, api_error
-
+from flasgger import swag_from
+from chat_api.docs_path import doc
 landing_bp = Blueprint("landing", __name__, url_prefix="/api")
 
 
@@ -14,60 +15,10 @@ landing_bp = Blueprint("landing", __name__, url_prefix="/api")
 # Routes
 # -------------------------
 @landing_bp.route("/landing", methods=["GET"])
+@swag_from(doc("landing", "get_landing_data.yml"))
 def get_landing_data():
     """
-    Get landing page data
-    ---
-    tags:
-      - Landing
-    summary: Retrieve landing page content and platform statistics
-    description: Returns localized landing page content along with platform-wide statistics,
-      including total users, jobs, chats, and messages.
-    responses:
-      200:
-        description: Landing data retrieved successfully
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-              example: 200
-            message:
-              type: string
-              example: landing data retrieved
-            data:
-              type: object
-              properties:
-                hero:
-                  type: object
-                problem_section:
-                  type: object
-                solution_section:
-                  type: object
-                features_section:
-                  type: object
-                how_it_works:
-                  type: object
-                stats:
-                  type: object
-                  properties:
-                    title:
-                      type: string
-                    items:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          key:
-                            type: string
-                          label:
-                            type: string
-                          value:
-                            type: integer
-                final_cta:
-                  type: object
-      500:
-        description: Failed to fetch landing data
+    
     """
     try:
         stats = {

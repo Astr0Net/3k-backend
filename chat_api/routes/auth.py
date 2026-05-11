@@ -14,82 +14,16 @@ from chat_api.models import User, TokenBlocklist
 from ..utils.response_utils import api_ok, api_error, normalize_username
 from ..service.auth_validators import validate_username, validate_password
 
-
+from flasgger import swag_from
+from chat_api.docs_path import doc
 auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.route("/register", methods=["POST"])
+@swag_from(doc("auth", "register.yml"))
 def register():
     """
-    Register a new user
-    ---
-    tags:
-      - Auth
-    summary: Create a new user account
-    description: >
-      Creates a new user using a username and password.
-      The username is normalized before validation and saving.
-    consumes:
-      - application/json
-    parameters:
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          required:
-            - username
-            - password
-          properties:
-            username:
-              type: string
-              example: mohammad
-            password:
-              type: string
-              example: StrongPass123
-    responses:
-      201:
-        description: User created successfully
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-              example: 201
-            message:
-              type: string
-              example: user created
-            data:
-              type: object
-              properties:
-                user:
-                  type: object
-      400:
-        description: Invalid username or password
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-            error:
-              type: string
-              example: username is invalid
-            data:
-              type: object
-              nullable: true
-      409:
-        description: Username already exists
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-            error:
-              type: string
-              example: username already exists
-            data:
-              type: object
-              nullable: true
+    
     """
     data = request.get_json(silent=True) or {}
     username = normalize_username(data.get("username"))
@@ -113,58 +47,10 @@ def register():
 
 
 @auth_bp.route("/login", methods=["POST"])
+@swag_from(doc("auth", "login.yml"))
 def login():
     """
-    Login user
-    ---
-    tags:
-      - Auth
-    summary: Authenticate user and return JWT tokens
-    consumes:
-      - application/json
-    parameters:
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          required:
-            - username
-            - password
-          properties:
-            username:
-              type: string
-              example: johndoe
-            password:
-              type: string
-              example: strongPassword123
-    responses:
-      200:
-        description: Login successful
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-            message:
-              type: string
-              example: login successful
-            data:
-              type: object
-              properties:
-                user:
-                  type: object
-                access_token:
-                  type: string
-                refresh_token:
-                  type: string
-                token_type:
-                  type: string
-                  example: Bearer
-      400:
-        description: Username and password are required
-      401:
-        description: Invalid credentials
+    
     """
 
 
@@ -196,37 +82,11 @@ def login():
 
 
 @auth_bp.route("/refresh", methods=["POST"])
+@swag_from(doc("auth", "refresh.yml"))
 @jwt_required(refresh=True)
 def refresh():
     """
-    Refresh access token
-    ---
-    tags:
-      - Auth
-    summary: Generate new access token using refresh token
-    security:
-      - BearerAuth: []
-    responses:
-      200:
-        description: Token refreshed
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-            message:
-              type: string
-              example: token refreshed
-            data:
-              type: object
-              properties:
-                access_token:
-                  type: string
-                token_type:
-                  type: string
-                  example: Bearer
-      401:
-        description: Invalid or missing refresh token
+    
     """
 
     user_id = get_jwt_identity()  # string
@@ -240,32 +100,11 @@ def refresh():
 
 
 @auth_bp.route("/logout", methods=["POST"])
+@swag_from(doc("auth", "logout.yml"))
 @jwt_required()
 def logout():
     """
-    Logout user
-    ---
-    tags:
-      - Auth
-    summary: Invalidate the current JWT token
-    security:
-      - BearerAuth: []
-    responses:
-      200:
-        description: Logged out successfully
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-            message:
-              type: string
-              example: logged out
-            data:
-              type: object
-              nullable: true
-      401:
-        description: Invalid token payload
+    
     """
 
     jwt_payload = get_jwt()

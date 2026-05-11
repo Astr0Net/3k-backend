@@ -1,0 +1,16 @@
+Get admin dashboard statistics
+---
+tags:
+  - Admin
+summary: Get overall platform statistics (admin only)
+security:
+  - BearerAuth: []
+responses:
+  200:
+    description: Admin statistics retrieved successfully
+  401:
+    description: Missing/invalid token
+  403:
+    description: Access denied
+  500:
+    description: Internal server error

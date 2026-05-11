@@ -1,0 +1,60 @@
+Update chat title
+---
+tags:
+  - Chat
+summary: Update the title of a chat
+security:
+  - BearerAuth: []
+consumes:
+  - application/json
+parameters:
+  - name: chat_id
+    in: path
+    required: true
+    type: integer
+    description: ID of the chat
+  - name: body
+    in: body
+    required: true
+    schema:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          example: Job Search Discussion
+responses:
+  200:
+    description: Chat title updated
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: chat title updated
+        data:
+          type: object
+          properties:
+            chat:
+              type: object
+              properties:
+                chat_id:
+                  type: integer
+                title:
+                  type: string
+                created_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+  400:
+    description: Invalid title
+  404:
+    description: Chat not found
+  401:
+    description: Missing or invalid JWT token

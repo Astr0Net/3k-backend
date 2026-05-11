@@ -1,0 +1,37 @@
+Create chat
+---
+tags:
+  - Chat
+summary: Create a new chat for the authenticated user
+security:
+  - BearerAuth: []
+responses:
+  201:
+    description: Chat created successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: chat created
+        data:
+          type: object
+          properties:
+            chat:
+              type: object
+              properties:
+                chat_id:
+                  type: integer
+                title:
+                  type: string
+                created_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+  401:
+    description: Missing or invalid JWT token

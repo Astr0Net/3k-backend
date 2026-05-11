@@ -1,0 +1,73 @@
+Update resume
+---
+tags:
+  - Resume
+summary: Update an existing resume
+description: Updates the title or content of a resume owned by the authenticated user.
+security:
+  - BearerAuth: []
+consumes:
+  - application/json
+parameters:
+  - in: path
+    name: resume_id
+    type: integer
+    required: true
+    description: Resume ID
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      properties:
+        title:
+          type: string
+          example: "رزومه به روز شده"
+        content:
+          type: string
+          example: "محتوای جدید رزومه"
+responses:
+  200:
+    description: Resume updated successfully
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "resume updated successfully"
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            title:
+              type: string
+              example: "رزومه به روز شده"
+            content:
+              type: string
+              example: "محتوای جدید رزومه"
+            created_at:
+              type: string
+              example: "2026-05-08T15:00:00"
+            updated_at:
+              type: string
+              example: "2026-05-08T15:00:00"
+  400:
+    description: Validation error
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "title cannot be empty"
+  404:
+    description: Resume not found
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "resume not found"
+  401:
+    description: Missing or invalid JWT token

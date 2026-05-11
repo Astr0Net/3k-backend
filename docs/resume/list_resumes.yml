@@ -1,0 +1,33 @@
+List resumes
+---
+tags:
+  - Resume
+summary: List all resumes of the authenticated user
+description: Returns all resumes owned by the authenticated user ordered by updated time descending.
+security:
+  - BearerAuth: []
+responses:
+  200:
+    description: List of resumes
+    schema:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 1
+              title:
+                type: string
+                example: "رزومه برنامه نویس بک اند"
+              created_at:
+                type: string
+                example: "2026-05-08T15:00:00"
+              updated_at:
+                type: string
+                example: "2026-05-08T15:00:00"
+  401:
+    description: Missing or invalid JWT token

@@ -1,0 +1,63 @@
+Create resume
+---
+tags:
+  - Resume
+summary: Create a new resume for the authenticated user
+description: Creates a new resume with a title and content for the authenticated user.
+security:
+  - BearerAuth: []
+consumes:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          example: "رزومه برنامه نویس بک اند"
+        content:
+          type: string
+          example: "تجربه 3 سال برنامه نویسی پایتون و Flask"
+responses:
+  201:
+    description: Resume created successfully
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "resume created successfully"
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            title:
+              type: string
+              example: "رزومه برنامه نویس بک اند"
+            content:
+              type: string
+              example: "تجربه 3 سال برنامه نویسی پایتون و Flask"
+            created_at:
+              type: string
+              example: "2026-05-08T15:00:00"
+            updated_at:
+              type: string
+              example: "2026-05-08T15:00:00"
+  400:
+    description: Validation error
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "title is required"
+  401:
+    description: Missing or invalid JWT token

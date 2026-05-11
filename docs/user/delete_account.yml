@@ -1,0 +1,20 @@
+Permanently delete authenticated user's account.
+
+---
+tags:
+  - Users
+summary: Delete user account (Cascade delete enabled)
+description: >
+  Deletes the authenticated user's account and all related data.
+  Cascade rules defined in the User model will remove associated chats.
+
+security:
+  - BearerAuth: []
+
+responses:
+  200:
+    description: Account deleted successfully
+  404:
+    description: User not found
+  500:
+    description: Internal server error

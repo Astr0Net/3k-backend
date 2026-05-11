@@ -1,0 +1,69 @@
+Register a new user
+---
+tags:
+  - Auth
+summary: Create a new user account
+description: >
+  Creates a new user using a username and password.
+  The username is normalized before validation and saving.
+consumes:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: mohammad
+        password:
+          type: string
+          example: StrongPass123
+responses:
+  201:
+    description: User created successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: user created
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+  400:
+    description: Invalid username or password
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+          example: username is invalid
+        data:
+          type: object
+          nullable: true
+  409:
+    description: Username already exists
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+          example: username already exists
+        data:
+          type: object
+          nullable: true

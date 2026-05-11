@@ -1,0 +1,14 @@
+Retrieve the authenticated user's profile.
+
+---
+tags:
+  - Users
+summary: Get authenticated user profile
+security:
+  - BearerAuth: []
+
+responses:
+  200:
+    description: User profile retrieved successfully
+  404:
+    description: User not found
