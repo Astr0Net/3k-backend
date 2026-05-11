@@ -99,8 +99,8 @@ def register():
     if err:
         return api_error(err, 400)
 
-    hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
-    user = User(username=username, password=hashed_pw)
+    user = User(username=username)
+    user.set_password(password)
 
     db.session.add(user)
     try:
@@ -176,8 +176,9 @@ def login():
         return api_error("username and password are required", 400)
 
     user = User.query.filter_by(username=username).first()
-    if not user or not bcrypt.check_password_hash(user.password, password):
-        return api_error("invalid credentials", 401)
+    if not user or not user.check_password(password):
+      return api_error("Invalid username or password", 401)
+
 
     access_token = create_access_token(identity=str(user.user_id))
     refresh_token = create_refresh_token(identity=str(user.user_id))
@@ -279,43 +280,3 @@ def logout():
     db.session.commit()
 
     return api_ok(data=None, message="logged out", http_status=200)
-
-
-@auth_bp.route("/me", methods=["GET"])
-@jwt_required()
-def me():
-    """
-    Get current user
-    ---
-    tags:
-      - Auth
-    summary: Get authenticated user information
-    security:
-      - BearerAuth: []
-    responses:
-      200:
-        description: User information retrieved
-        schema:
-          type: object
-          properties:
-            status:
-              type: integer
-            message:
-              type: string
-              example: ok
-            data:
-              type: object
-              properties:
-                user:
-                  type: object
-      404:
-        description: User not found
-    """
-
-    user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
-
-    if not user:
-        return api_error("user not found", 404)
-
-    return api_ok(data={"user": user.to_dict()}, message="ok", http_status=200)

@@ -3,7 +3,7 @@ from chat_api.extensions import db
 
 
 class Resume(db.Model):
-    __tablename__ = "resumes"  # بهتره plural باشه
+    __tablename__ = "resumes"
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -30,7 +30,7 @@ class Resume(db.Model):
         nullable=False
     )
 
-    user = db.relationship("Users", backref="resumes")
+    user = db.relationship("User", backref="resumes")
 
     def __repr__(self):
         return f"<Resume {self.id} - {self.title}>"

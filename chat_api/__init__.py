@@ -99,6 +99,7 @@ def create_app():
     from .routes.landing import landing_bp
     from .routes.admin import admin_bp
     from .routes.resume import resume_bp
+    from .routes.users import users_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(chat_bp, url_prefix="/api")
@@ -106,6 +107,7 @@ def create_app():
     app.register_blueprint(landing_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(resume_bp, url_prefix="/api")
+    app.register_blueprint(users_bp, url_prefix='/api') 
 
     # ساخت جداول
     with app.app_context():

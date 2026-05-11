@@ -19,15 +19,15 @@ class Message(db.Model):
         nullable=False
     )
 
-    created_at = db.Column(
-        db.DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+    role = db.Column(
+        db.String(20),
         nullable=False,
         index=True
     )
 
-    is_user = db.Column(
-        db.Boolean,
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True
     )
@@ -42,6 +42,6 @@ class Message(db.Model):
             "message_id": self.message_id,
             "chat_id": self.chat_id,
             "content": self.content,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "is_user": self.is_user
+            "role": self.role,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }

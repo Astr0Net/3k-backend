@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from ..extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class User(db.Model):
@@ -55,3 +56,11 @@ class User(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
+
+    def set_password(self, password):
+        """هش کردن و ذخیره پسورد"""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """بررسی صحت پسورد"""
+        return check_password_hash(self.password_hash, password)

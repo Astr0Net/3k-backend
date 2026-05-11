@@ -1,7 +1,8 @@
 import json
 from chat_api.models import Message
 from ..extensions import db
-from ..utils.message_utils import sse, chat_brief
+from ..utils.message_utils import sse
+from ..utils.chat_utils import chat_brief
 
 STATIC_BOT_TEXT = (
     "گزارش تست سامانه پیشنهاد شغل\n"
@@ -111,7 +112,7 @@ def stream_static_reply(chat, user_msg, user_text: str, user_id: int, title_chan
         )
 
         # 3) jobs (optional but kept for UI compatibility)
-        yield sse("jobs", {"items": STATIC_JOBS})
+        # yield sse("jobs", {"items": STATIC_JOBS})
 
         # 4) content
         yield sse("content", {"delta": STATIC_BOT_TEXT})

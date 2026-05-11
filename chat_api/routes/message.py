@@ -235,9 +235,9 @@ def create_message(chat_id):
     # فقط stream_static_reply رو با stream_bot_reply عوض کن.
     return Response(
         stream_with_context(
-            # stream_static_reply(chat, user_msg, content, user_id, title_changed)
+            stream_static_reply(chat, user_msg, content, user_id, title_changed)
             # در صورت نیاز:
-            stream_bot_reply(chat, user_msg, content, user_id, title_changed)
+            # stream_bot_reply(chat, user_msg, content, user_id, title_changed)
         ),
         mimetype="text/event-stream",
         headers={
