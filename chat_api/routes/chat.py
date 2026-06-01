@@ -7,7 +7,7 @@ from chat_api.models import Chat
 from ..utils.response_utils import api_ok, api_error
 from ..utils.chat_utils import chat_brief, current_user_id, get_chat_if_owner
 from flasgger import swag_from
-from chat_api.docs_path import doc
+from chat_api.service.docs_path import doc
 chat_bp = Blueprint("chat", __name__)
 
 

@@ -28,7 +28,7 @@ from chat_api.service.auth_validators import (
     validate_password,
 )
 from flasgger import swag_from
-from chat_api.docs_path import doc
+from chat_api.service.docs_path import doc
 users_bp = Blueprint("users", __name__)
 
 

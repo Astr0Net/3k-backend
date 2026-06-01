@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from chat_api.extensions import db
 from chat_api.models.resume import Resume
 from flasgger import swag_from
-from chat_api.docs_path import doc
+from chat_api.service.docs_path import doc
 resume_bp = Blueprint("resume", __name__, url_prefix="/resumes")
 
 

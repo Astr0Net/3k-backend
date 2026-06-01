@@ -13,7 +13,7 @@ from ..utils.response_utils import api_ok, api_error
 from ..utils.message_utils import message_dto
 
 from flasgger import swag_from
-from chat_api.docs_path import doc
+from chat_api.service.docs_path import doc
 message_bp = Blueprint("message", __name__)
 
 

@@ -15,7 +15,7 @@ from ..utils.response_utils import api_ok, api_error, normalize_username
 from ..service.auth_validators import validate_username, validate_password
 
 from flasgger import swag_from
-from chat_api.docs_path import doc
+from chat_api.service.docs_path import doc
 auth_bp = Blueprint("auth", __name__)
 
 

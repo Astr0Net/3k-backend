@@ -1,135 +1,156 @@
-import json
+import time
+from datetime import datetime, timezone
+
 from chat_api.models import Message
 from ..extensions import db
 from ..utils.message_utils import sse
 from ..utils.chat_utils import chat_brief
 
-STATIC_BOT_TEXT = (
-    "گزارش تست سامانه پیشنهاد شغل\n"
-    "---------------------------------\n"
-    "این پاسخ در حالت تست استاتیک تولید شده است. در این حالت هیچ مدل هوش مصنوعی "
-    "یا سرویس خارجی فراخوانی نمی‌شود و هدف آن صرفاً بررسی عملکرد کامل سیستم است.\n\n"
-    "در این تست موارد زیر بررسی می‌شوند:\n"
-    "1. ذخیره شدن پیام کاربر در دیتابیس\n"
-    "2. ارسال صحیح رویدادهای SSE از سمت سرور\n"
-    "3. دریافت و رندر پیام بات در رابط کاربری\n"
-    "4. نمایش کارت‌های شغلی با ساختار واقعی API\n"
-    "5. تست تعاملات UI مانند کلیک روی لینک شغل یا مشاهده جزئیات\n\n"
-    "کارت‌های شغلی نمایش داده شده در ادامه داده‌های نمونه هستند که برای تست "
-    "فرانت‌اند و جریان کامل سیستم تولید شده‌اند.\n"
+
+STATIC_REPORT_INTRO = "✅ ۳ آگهی پیشنهادی از دیتابیس پیدا شد. در حال آماده‌سازی گزارش..."
+STATIC_REPORT_BODY = (
+    "۱) خلاصه آگهی‌ها:\n"
+    "- Backend Developer: تمرکز روی توسعه API و بهینه‌سازی سرویس‌ها\n"
+    "- Data Engineer: تمرکز روی ساخت پایپلاین داده و ETL\n"
+    "- ML Engineer: تمرکز روی پیاده‌سازی مدل‌ها و سرویس‌دهی آنها\n\n"
+    "۲) ارزیابی تطبیق:\n"
+    "با توجه به مهارت‌های قابل برداشت از متن کاربر، بیشترین تطبیق با نقش Backend است؛ "
+    "نقش Data Engineer در صورت داشتن تجربه پایپلاین/ETL توصیه می‌شود؛ "
+    "نقش ML Engineer مناسب‌تر است اگر تجربه NLP/LLM و استقرار مدل دارید.\n\n"
+    "۳) پیشنهاد نهایی:\n"
+    "اگر هدف ورود سریع‌تر به بازار و استفاده از مهارت‌های فعلی است، Backend انتخاب اول است."
 )
 
-STATIC_JOBS = [
+# دقیقاً هم‌اسکیما با build_cards(...)
+STATIC_JOB_ITEMS = [
     {
         "title": "Python Backend Developer",
-        "company_name": "Demo Company",
-        "location": "Remote",
+        "company_name": "Acme Co",
+        "location": "Tehran",
         "paycheck": "Negotiable",
         "requirements": [
             "Python",
             "Flask",
-            "REST API Development",
-            "SQL / PostgreSQL",
-            "Docker",
-            "Git"
-        ],
-        "match_percent": 96,
-        "job_url": "https://example.com/jobs/python-backend",
-        "source_site": "LinkedIn",
-        "company_reviews": {
-            "rating": 4.2,
-            "reviews_count": 120,
-            "summary": "محیط کاری مناسب برای توسعه‌دهندگان بک‌اند با تیم فنی فعال."
-        }
-    },
-    {
-        "title": "Backend Engineer (APIs)",
-        "company_name": "Test Startup",
-        "location": "Tehran",
-        "paycheck": "40M - 60M Toman",
-        "requirements": [
-            "Python",
-            "FastAPI",
-            "Microservices",
+            "SQLAlchemy",
+            "REST API",
             "PostgreSQL",
-            "Redis",
-            "CI/CD"
+            "Docker",
         ],
-        "match_percent": 91,
-        "job_url": "https://example.com/jobs/backend-engineer",
-        "source_site": "Jobinja",
+        "match_percent": 86,
+        "job_url": "https://example.com/jobs/1",
+        "source_site": "mock",
         "company_reviews": {
-            "rating": 3.9,
-            "reviews_count": 54,
-            "summary": "استارتاپ در حال رشد با تمرکز بر توسعه سرویس‌های مقیاس‌پذیر."
-        }
+            "summary": "محیط حرفه‌ای با فرصت رشد",
+            "rating": 4.2,
+            "pros": ["تیم خوب", "فرصت رشد"],
+            "cons": ["فشار کاری مقطعی"],
+        },
     },
     {
-        "title": "Junior Data Engineer",
-        "company_name": "Sample Tech",
-        "location": "Hybrid",
-        "paycheck": "30M - 45M Toman",
-        "requirements": [
-            "Python",
-            "ETL Pipelines",
-            "Airflow",
-            "SQL",
-            "Data Warehousing",
-            "Linux"
-        ],
-        "match_percent": 87,
-        "job_url": "https://example.com/jobs/data-engineer",
-        "source_site": "Indeed",
+        "title": "Data Engineer",
+        "company_name": "Example Ltd",
+        "location": "Remote",
+        "paycheck": "120M - 160M",
+        "requirements": ["Python", "SQL", "ETL", "Airflow", "Data Modeling"],
+        "match_percent": 74,
+        "job_url": "https://example.com/jobs/2",
+        "source_site": "mock",
+        "company_reviews": None,
+    },
+    {
+        "title": "ML Engineer",
+        "company_name": "QomAI",
+        "location": "Qom",
+        "paycheck": "-",
+        "requirements": ["Python", "NLP", "LLM APIs", "Vector Search", "MLOps basics"],
+        "match_percent": 69,
+        "job_url": "https://example.com/jobs/3",
+        "source_site": "mock",
         "company_reviews": {
+            "summary": "محصول جذاب، نیاز به خودمدیریتی",
             "rating": 4.0,
-            "reviews_count": 78,
-            "summary": "شرکت داده‌محور با تمرکز بر تحلیل و پردازش داده‌های بزرگ."
-        }
-    }
+        },
+    },
 ]
+
+
+def _chunk_text(text: str, chunk_size: int = 220):
+    text = text or ""
+    for i in range(0, len(text), chunk_size):
+        part = text[i:i + chunk_size]
+        if part:
+            yield part
 
 
 def stream_static_reply(chat, user_msg, user_text: str, user_id: int, title_changed: bool):
     """
-    Static SSE stream without any LLM usage.
-    Keeps the same event order expected by the frontend:
-    intent -> meta -> jobs -> content -> done
+    SSE stream compatible with frontend parser and aligned with online mode.
+
+    Event order:
+      meta -> content -> jobs -> content* -> done
+    Error:
+      error
     """
+    full_text = ""
+
     try:
-        # 1) intent
-        intent_type = "CHAT"
-        yield sse("intent", {"type": intent_type})
+        intent_type = "analyze"
 
-        # 2) meta
-        yield sse(
-            "meta",
-            {
-                "chat": chat_brief(chat),
-                "user_message_id": user_msg.message_id,
-                "type": intent_type,
-                "title_changed": title_changed,
-            },
-        )
+        # 1) meta
+        yield sse("meta", {
+            "chat": chat_brief(chat),
+            "user_message_id": user_msg.message_id,
+            "type": intent_type,
+            "title_changed": title_changed,
+        })
 
-        # 3) jobs (optional but kept for UI compatibility)
-        # yield sse("jobs", {"items": STATIC_JOBS})
+        # 2) اولین content مثل حالت analyze آنلاین
+        full_text += STATIC_REPORT_INTRO
+        yield sse("content", {
+            "delta": STATIC_REPORT_INTRO
+        })
+        time.sleep(0.03)
 
-        # 4) content
-        yield sse("content", {"delta": STATIC_BOT_TEXT})
+        # 3) jobs
+        yield sse("jobs", {
+            "items": STATIC_JOB_ITEMS
+        })
 
-        # 5) save assistant message
+        # 4) ادامه گزارش با delta
+        report_body = "\n\n" + STATIC_REPORT_BODY
+        for part in _chunk_text(report_body, chunk_size=220):
+            full_text += part
+            yield sse("content", {
+                "delta": part
+            })
+            time.sleep(0.03)
+
+        if not full_text.strip():
+            yield sse("error", {
+                "message": "empty bot content"
+            })
+            return
+
+        # 5) ذخیره پیام بات
         bot_msg = Message(
             chat_id=chat.chat_id,
-            content=STATIC_BOT_TEXT,
-            time=Message.now_as_string(),
-            is_user=False,
+            content=full_text.strip(),
+            role="assistant",
         )
         db.session.add(bot_msg)
+
+        if hasattr(chat, "updated_at"):
+            chat.updated_at = datetime.now(timezone.utc)
+
         db.session.commit()
 
         # 6) done
-        yield sse("done", {"bot_message_id": bot_msg.message_id})
+        yield sse("done", {
+            "bot_message_id": bot_msg.message_id
+        })
 
     except Exception as e:
         db.session.rollback()
-        yield sse("error", {"message": str(e)})
+        yield sse("error", {
+            "message": str(e)
+        })

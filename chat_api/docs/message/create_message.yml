@@ -1,0 +1,82 @@
+---
+tags:
+  - Message
+summary: Create a user message and receive streamed assistant response
+description: >
+  Creates a new user message in the specified chat. The response is a Server-Sent Events (SSE) stream.
+  The stream follows a strict sequence:
+  1. 'meta': Metadata about the chat and message intent.
+  2. 'jobs': (Optional) Job cards if intent is 'analyze'.
+  3. 'content': Streamed text chunks.
+  4. 'done': Signal indicating the end of the response.
+  5. 'error': (If applicable) Error details.
+
+security:
+  - BearerAuth: []
+consumes:
+  - application/json
+produces:
+  - text/event-stream
+parameters:
+  - in: path
+    name: chat_id
+    type: integer
+    required: true
+    description: ID of the chat
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          example: "رزومه من را تحلیل کن"
+responses:
+  200:
+    description: Stream of SSE events representing the analysis or chat response.
+    schema:
+      type: string
+      example: |
+        event: meta
+        data: {"chat": {"id": 1, "title": "تحلیل رزومه"}, "user_message_id": 101, "type": "analyze", "title_changed": false}
+
+        event: jobs
+        data: {"items": [{"title": "Python Developer", "company_name": "TechCo", "match_percent": 95.5, "requirements": ["Python", "Flask"], "job_url": "https://example.com/1", "source_site": "Jobinja", "company_reviews": {"score": 4.5, "count": 100}}]}
+
+        event: content
+        data: {"delta": "رزومه "}
+
+        event: content
+        data: {"delta": "شما "}
+
+        event: content
+        data: {"delta": "تحلیل شد."}
+
+        event: done
+        data: {"bot_message_id": 102}
+  400:
+    description: Content is required
+    schema:
+      type: object
+      properties:
+        status: {type: integer, example: 400}
+        error: {type: string, example: "content is required"}
+  401:
+    description: Missing or invalid JWT token
+  404:
+    description: Chat not found
+    schema:
+      type: object
+      properties:
+        status: {type: integer, example: 404}
+        error: {type: string, example: "chat not found"}
+  500:
+    description: Internal server error
+    schema:
+      type: object
+      properties:
+        status: {type: integer, example: 500}
+        error: {type: string}
