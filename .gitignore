@@ -16,3 +16,6 @@ instance/
 
 # Logs
 *.log
+
+# zip
+*.zip

@@ -1,0 +1,58 @@
+Get jobs list with search and filter
+---
+tags:
+  - Admin
+summary: Get all jobs with search and filter (admin only)
+security:
+  - BearerAuth: []
+parameters:
+  - in: query
+    name: q
+    type: string
+    required: false
+    description: Search in job_title, company_name, raw_text
+  - in: query
+    name: source_site
+    type: string
+    required: false
+    description: Filter by source site
+  - in: query
+    name: location
+    type: string
+    required: false
+    description: Filter by location
+  - in: query
+    name: page
+    type: integer
+    required: false
+    default: 1
+  - in: query
+    name: per_page
+    type: integer
+    required: false
+    default: 20
+responses:
+  200:
+    description: Jobs retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+        data:
+          type: object
+          properties:
+            jobs:
+              type: array
+              items:
+                type: object
+            total:
+              type: integer
+            page:
+              type: integer
+            pages:
+              type: integer
+  401:
+    description: Missing/invalid token
+  403:
+    description: Access denied

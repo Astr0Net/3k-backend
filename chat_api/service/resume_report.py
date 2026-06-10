@@ -39,7 +39,7 @@ def analyze_resume_stream(user_text: str):
 
         # cards
         cards = build_cards(top_jobs, reviews_map)
-        yield "✅ ۳ آگهی پیشنهادی از دیتابیس پیدا شد. در حال آماده‌سازی گزارش..."
+        yield ("content", "✅ ۳ آگهی پیشنهادی از دیتابیس پیدا شد. در حال آماده‌سازی گزارش...")
         yield ("jobs", {"items": cards})
 
         # report

@@ -1,0 +1,54 @@
+Get single job by admin
+---
+tags:
+  - Admin
+summary: Get full details of a single job listing (admin only)
+security:
+  - BearerAuth: []
+parameters:
+  - in: path
+    name: job_id
+    type: integer
+    required: true
+    description: ID of the job
+responses:
+  200:
+    description: Job retrieved successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: ok
+        data:
+          type: object
+          properties:
+            job_id:
+              type: integer
+            job_url:
+              type: string
+            source_site:
+              type: string
+            job_title:
+              type: string
+            company_name:
+              type: string
+            location:
+              type: string
+            paycheck:
+              type: string
+            requirements:
+              type: object
+            raw_text:
+              type: string
+            has_embedding:
+              type: boolean
+  401:
+    description: Missing/invalid token
+  403:
+    description: Access denied
+  404:
+    description: Job not found 

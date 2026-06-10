@@ -8,7 +8,7 @@ from chat_api.models import User, Job, Chat, Message
 from ..utils.response_utils import api_ok, api_error
 from flasgger import swag_from
 from chat_api.service.docs_path import doc
-landing_bp = Blueprint("landing", __name__, url_prefix="/api")
+landing_bp = Blueprint("landing", __name__)
 
 
 # -------------------------

@@ -1,0 +1,22 @@
+Delete user by admin
+---
+tags:
+  - Admin
+summary: Delete a user account and all related data (admin only)
+security:
+  - BearerAuth: []
+parameters:
+  - in: path
+    name: user_id
+    type: integer
+    required: true
+    description: ID of the user to delete
+responses:
+  200:
+    description: User deleted successfully
+  401:
+    description: Missing/invalid token
+  403:
+    description: Access denied
+  404:
+    description: User not found

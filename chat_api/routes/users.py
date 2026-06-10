@@ -45,7 +45,7 @@ def get_me():
     """
 
     user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return api_error("User not found", 404)
@@ -69,7 +69,7 @@ def update_me():
     """
 
     user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return api_error("User not found", 404)
@@ -149,7 +149,7 @@ def change_password():
     """
 
     user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return api_error("User not found", 404)
@@ -192,7 +192,7 @@ def delete_account():
     """
 
     user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return api_error("User not found", 404)

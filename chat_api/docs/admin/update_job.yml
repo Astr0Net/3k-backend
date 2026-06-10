@@ -1,0 +1,43 @@
+Update job by admin
+---
+tags:
+  - Admin
+summary: Edit a job listing (admin only)
+security:
+  - BearerAuth: []
+parameters:
+  - in: path
+    name: job_id
+    type: integer
+    required: true
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      properties:
+        job_title:
+          type: string
+        company_name:
+          type: string
+        location:
+          type: string
+        paycheck:
+          type: string
+        requirements:
+          type: array
+          items:
+            type: string
+        raw_text:
+          type: string
+responses:
+  200:
+    description: Job updated successfully
+  400:
+    description: No valid fields provided
+  401:
+    description: Missing/invalid token
+  403:
+    description: Access denied
+  404:
+    description: Job not found
