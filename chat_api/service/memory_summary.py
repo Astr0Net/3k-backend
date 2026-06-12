@@ -2,9 +2,28 @@ from chat_api.models import Chat, Message
 from ..extensions import db
 from .qom_llm import qom_chat
 
-SYSTEM_PROMPT = """
-شما یک مشاور شغلی و تحلیل‌گر منابع انسانی حرفه‌ای هستید.
-پاسخ‌ها فارسی، دقیق، بدون حدس و ساختگی.
+SUMMARY_SYSTEM = """
+You are a memory manager for a job-search assistant chatbot.
+Your only job is to create and update a concise conversation summary in Persian.
+Output ONLY the summary text. No explanation. No preamble.
+""".strip()
+
+SUMMARY_PROMPT_TEMPLATE = """
+وظیفه: خلاصه حافظه مکالمه را به‌روز کن.
+
+## خلاصه فعلی:
+{previous_summary}
+
+## پیام‌های جدید:
+{new_block}
+
+## قوانین خلاصه‌سازی:
+- حداکثر ۱۵۰ کلمه
+- فقط اطلاعات مهم را نگه دار: هدف کاربر، مهارت‌های ذکرشده، سوالات کلیدی، تصمیم‌ها
+- اطلاعات تکراری یا بی‌ربط را حذف کن
+- اگر خلاصه قبلی وجود دارد، آن را با اطلاعات جدید ادغام کن — همه چیز را از نو ننویس
+- زبان: فارسی
+- فرمت: چند جمله پیوسته، بدون bullet point
 """.strip()
 
 
@@ -30,37 +49,32 @@ def update_chat_summary(chat_id: int, user_id: int | None = None, chunk_limit: i
         return
 
     new_block = "\n".join(
-        [f"{m.role}: {m.content}" for m in new_msgs]
+        [f"{m.role}: {(m.content or '').strip()[:300]}" for m in new_msgs]
     )
-    previous_summary = (chat.summary or "").strip()
+    previous_summary = (chat.summary or "ندارد").strip()
 
-    prompt = f"""
-تو باید یک خلاصه‌ی حافظه‌ای کوتاه و دقیق از مکالمه بسازی و همیشه به‌روز نگهش داری.
-
-خلاصه قبلی:
-\"\"\"{previous_summary}\"\"\"
-
-پیام‌های جدید:
-\"\"\"{new_block}\"\"\"
-
-قواعد:
-- خروجی فقط خودِ خلاصه باشد
-- فارسی، کوتاه، شامل نکات مهم/هدف/تصمیم‌ها
-""".strip()
+    prompt = SUMMARY_PROMPT_TEMPLATE.format(
+        previous_summary=previous_summary,
+        new_block=new_block,
+    )
 
     try:
         summary = qom_chat(
             [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": SUMMARY_SYSTEM},
+                {"role": "user", "content": prompt},
             ],
             temperature=0,
-            max_tokens=260
+            max_tokens=280,
         )
     except Exception:
         return
 
-    chat.summary = (summary or "").strip()
+    summary = (summary or "").strip()
+    if not summary:
+        return
+
+    chat.summary = summary
     chat.last_summarized_message_id = new_msgs[-1].message_id
     db.session.commit()
 

@@ -4,15 +4,52 @@ from .company_reviews import fetch_company_reviews
 from .job_scoring import open_conn, load_jobs_with_embeddings, score_jobs, build_cards, build_jobs_text_for_prompt
 
 
-SYSTEM_PROMPT = """
-شما یک «دستیار کاریابی» و تحلیل‌گر منابع انسانی حرفه‌ای هستید.
+RESUME_ANALYSIS_SYSTEM = """
+شما «دستیار کاریابی» هستید — تحلیل‌گر حرفه‌ای رزومه و بازار کار ایران.
 
-قوانین:
-- پاسخ‌ها رسمی، دقیق و حمایتی باشند
-- فقط بر اساس داده‌های ارائه‌شده پاسخ بده
-- از حدس، اغراق و اطلاعات ساختگی خودداری کن
-- زبان پاسخ‌ها فارسی باشد
-- اگر کاربر درباره هویت/نام/مدل پرسید، فقط بگو: «من یک دستیار کاریابی هستم.»
+## هویت
+- اگر کاربر درباره هویت پرسید: «من دستیار کاریابی شما هستم.»
+
+## قوانین تحلیل
+- فقط بر اساس داده‌های ارائه‌شده تحلیل کن — هیچ اطلاعاتی جعل نکن
+- اگر اطلاعات کافی نیست، صادقانه بگو
+- زبان: فارسی حرفه‌ای و حمایتی
+- از اغراق و تعریف‌های کلیشه‌ای خودداری کن
+""".strip()
+
+
+REPORT_PROMPT_TEMPLATE = """
+بر اساس رزومه کاربر و ۳ آگهی شغلی زیر، یک گزارش تحلیلی دقیق بنویس.
+
+[رزومه کاربر]
+{resume}
+
+[۳ آگهی منتخب با بیشترین تطابق]
+{jobs}
+
+---
+
+## ساختار گزارش (دقیقاً همین ترتیب را رعایت کن):
+
+### ۱. خلاصه سریع هر شغل
+برای هر شغل یک پاراگراف کوتاه: عنوان، شرکت، مهارت‌های کلیدی موردنیاز.
+
+### ۲. تحلیل تطابق رزومه با هر شغل
+برای هر شغل:
+- ✅ مهارت‌هایی که داری و با شغل match می‌کند
+- ❌ گپ‌های مهارتی (چه چیزی کم داری)
+- درصد تطابق کلی (همان مقداری که سیستم محاسبه کرده)
+
+### ۳. مقایسه نهایی ۳ شغل
+یک مقایسه کوتاه: کدام شغل برای چه پروفایلی مناسب‌تر است.
+
+### ۴. پیشنهاد بهترین گزینه
+یک شغل را به عنوان اولویت اول پیشنهاد بده + دلیل مشخص (نه کلیشه‌ای).
+
+### ۵. اقدام بعدی
+۲-۳ قدم عملی مشخص که کاربر باید همین هفته انجام دهد.
+
+{company_reviews_note}
 """.strip()
 
 
@@ -26,44 +63,41 @@ def analyze_resume_stream(user_text: str):
 
         rows = load_jobs_with_embeddings(cursor)
         if not rows:
-            yield "❌ هیچ آگهی شغلی برای مقایسه یافت نشد."
+            yield "❌ هیچ آگهی شغلی در دیتابیس یافت نشد."
             return
 
         resume_embedding = get_embedding(user_text, task_type="RETRIEVAL_QUERY")
         scored = score_jobs(rows, resume_embedding)
         top_jobs = scored[:3]
 
-        # reviews
         top_companies = [j.get("company_name") for j in top_jobs if j.get("company_name")]
         reviews_map = fetch_company_reviews(cursor, top_companies)
 
-        # cards
         cards = build_cards(top_jobs, reviews_map)
-        yield ("content", "✅ ۳ آگهی پیشنهادی از دیتابیس پیدا شد. در حال آماده‌سازی گزارش...")
+        yield "✅ ۳ آگهی پیشنهادی از دیتابیس پیدا شد. در حال آماده‌سازی گزارش..."
         yield ("jobs", {"items": cards})
 
-        # report
         jobs_text = build_jobs_text_for_prompt(top_jobs, reviews_map)
-        prompt = f"""
-بر اساس رزومه کاربر، ۳ موقعیت شغلی با بیشترین تطابق انتخاب شده‌اند.
 
-[رزومه کاربر]
-{user_text}
+        has_reviews = any(reviews_map.get(j.get("company_name")) for j in top_jobs)
+        company_reviews_note = (
+            "### نکته درباره شرکت‌ها\n"
+            "اطلاعات نظرات کارمندان برای برخی شرکت‌ها موجود است. "
+            "در پیشنهاد نهایی، ریسک‌ها و مزایای فرهنگ سازمانی را هم لحاظ کن."
+            if has_reviews else ""
+        )
 
-[۳ آگهی منتخب]
-{jobs_text}
-
-گزارش حرفه‌ای شامل:
-1) خلاصه هر آگهی
-2) ارزیابی تطابق رزومه با هر شغل
-3) مقایسه نهایی بین ۳ شغل
-4) پیشنهاد بهترین گزینه برای اقدام به همراه دلیل
-5) اگر «نظرات درباره شرکت» وجود داشت، در تصمیم‌گیری و ریسک‌ها/مزایا لحاظ کن
-""".strip()
+        prompt = REPORT_PROMPT_TEMPLATE.format(
+            resume=user_text,
+            jobs=jobs_text,
+            company_reviews_note=company_reviews_note,
+        )
 
         report = qom_chat(
-            [{"role": "system", "content": SYSTEM_PROMPT},
-             {"role": "user", "content": prompt}],
+            [
+                {"role": "system", "content": RESUME_ANALYSIS_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
         )
 
         for part in chunk_text(report, chunk_size=220):
