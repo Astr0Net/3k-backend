@@ -1,8 +1,5 @@
 import json
-from flask import jsonify
-from flask_jwt_extended import get_jwt_identity
-
-from chat_api.models import Chat, Message
+from chat_api.models import Message
 
 
 def message_dto(m: Message) -> dict:
@@ -11,8 +8,8 @@ def message_dto(m: Message) -> dict:
         "content": m.content,
         "created_at": m.created_at.isoformat() if m.created_at else None,
         "role": m.role,
+        "job_cards": None,  # توسط message_dto_list پر می‌شود
     }
-
 
 
 def sse(event: str, payload: dict):

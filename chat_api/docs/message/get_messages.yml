@@ -3,7 +3,7 @@ Get all messages of a chat
 tags:
   - Message
 summary: Get all messages of a chat
-description: Returns all messages for a chat that belongs to the authenticated user, ordered by creation time ascending.
+description: Returns all messages for a chat. Assistant messages include job_cards field (list of job cards or null).
 security:
   - BearerAuth: []
 parameters:
@@ -50,18 +50,46 @@ responses:
                   message_id:
                     type: integer
                     example: 10
-                  chat_id:
-                    type: integer
-                    example: 1
                   role:
                     type: string
-                    example: user
+                    example: assistant
                   content:
                     type: string
-                    example: "سلام، برای این موقعیت شغلی چقدر مناسبم؟"
+                    example: "رزومه شما تحلیل شد."
                   created_at:
                     type: string
                     format: date-time
+                  job_cards:
+                    type: array
+                    nullable: true
+                    description: >
+                      فقط برای پیام‌های assistant با intent=analyze.
+                      در حالت static همیشه STATIC_JOB_ITEMS برمی‌گردد.
+                      در حالت live از DB خوانده می‌شود.
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                        company_name:
+                          type: string
+                        location:
+                          type: string
+                        paycheck:
+                          type: string
+                        requirements:
+                          type: array
+                          items:
+                            type: string
+                        match_percent:
+                          type: integer
+                        job_url:
+                          type: string
+                        source_site:
+                          type: string
+                        company_reviews:
+                          type: object
+                          nullable: true
   401:
     description: Missing or invalid JWT token
   404:

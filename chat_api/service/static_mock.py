@@ -21,7 +21,6 @@ STATIC_REPORT_BODY = (
     "اگر هدف ورود سریع‌تر به بازار و استفاده از مهارت‌های فعلی است، Backend انتخاب اول است."
 )
 
-# دقیقاً هم‌اسکیما با build_cards(...)
 STATIC_JOB_ITEMS = [
     {
         "title": "Python Backend Developer",
@@ -82,21 +81,24 @@ def _chunk_text(text: str, chunk_size: int = 220):
             yield part
 
 
+def get_static_cards_for_message(message_id: int) -> list:
+    """
+    در حالت static، همیشه همان STATIC_JOB_ITEMS برمی‌گردد.
+    message_id فقط برای یکپارچگی امضا است.
+    """
+    return STATIC_JOB_ITEMS
+
+
 def stream_static_reply(chat, user_msg, user_text: str, user_id: int, title_changed: bool):
     """
-    SSE stream compatible with frontend parser and aligned with online mode.
-
-    Event order:
-      meta -> content -> jobs -> content* -> done
-    Error:
-      error
+    SSE stream - static/offline mode.
+    کارت‌ها در DB ذخیره نمی‌شوند؛ همیشه از STATIC_JOB_ITEMS سرو می‌شوند.
     """
     full_text = ""
 
     try:
         intent_type = "analyze"
 
-        # 1) meta
         yield sse("meta", {
             "chat": chat_brief(chat),
             "user_message_id": user_msg.message_id,
@@ -104,34 +106,22 @@ def stream_static_reply(chat, user_msg, user_text: str, user_id: int, title_chan
             "title_changed": title_changed,
         })
 
-        # 2) اولین content مثل حالت analyze آنلاین
         full_text += STATIC_REPORT_INTRO
-        yield sse("content", {
-            "delta": STATIC_REPORT_INTRO
-        })
+        yield sse("content", {"delta": STATIC_REPORT_INTRO})
         time.sleep(0.03)
 
-        # 3) jobs
-        yield sse("jobs", {
-            "items": STATIC_JOB_ITEMS
-        })
+        yield sse("jobs", {"items": STATIC_JOB_ITEMS})
 
-        # 4) ادامه گزارش با delta
         report_body = "\n\n" + STATIC_REPORT_BODY
         for part in _chunk_text(report_body, chunk_size=220):
             full_text += part
-            yield sse("content", {
-                "delta": part
-            })
+            yield sse("content", {"delta": part})
             time.sleep(0.03)
 
         if not full_text.strip():
-            yield sse("error", {
-                "message": "empty bot content"
-            })
+            yield sse("error", {"message": "empty bot content"})
             return
 
-        # 5) ذخیره پیام بات
         bot_msg = Message(
             chat_id=chat.chat_id,
             content=full_text.strip(),
@@ -144,13 +134,8 @@ def stream_static_reply(chat, user_msg, user_text: str, user_id: int, title_chan
 
         db.session.commit()
 
-        # 6) done
-        yield sse("done", {
-            "bot_message_id": bot_msg.message_id
-        })
+        yield sse("done", {"bot_message_id": bot_msg.message_id})
 
     except Exception as e:
         db.session.rollback()
-        yield sse("error", {
-            "message": str(e)
-        })
+        yield sse("error", {"message": str(e)})

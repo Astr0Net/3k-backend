@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from chat_api.models import Message
+from chat_api.models.job_card import JobCard
 from ..extensions import db
 
 from ..utils.message_utils import sse
@@ -19,6 +20,7 @@ def stream_bot_reply(chat, user_msg, user_text: str, user_id: int, title_changed
     - error
     """
     full_text = ""
+    pending_cards = None  # کارت‌ها را موقتاً نگه می‌داریم
 
     try:
         reply_gen = generate_bot_reply(chat.chat_id, user_text, user_id=user_id)
@@ -52,6 +54,7 @@ def stream_bot_reply(chat, user_msg, user_text: str, user_id: int, title_changed
             tag, chunk = item
 
             if tag == "jobs" and chunk:
+                pending_cards = chunk.get("items")
                 yield sse("jobs", chunk)
             elif tag == "content" and chunk:
                 full_text += chunk
@@ -70,6 +73,16 @@ def stream_bot_reply(chat, user_msg, user_text: str, user_id: int, title_changed
 
         if hasattr(chat, "updated_at"):
             chat.updated_at = datetime.now(timezone.utc)
+
+        db.session.flush()  # bot_msg.message_id را بگیریم
+
+        # ذخیره کارت‌ها در DB لینک به پیام bot
+        if pending_cards:
+            job_card = JobCard(
+                message_id=bot_msg.message_id,
+                cards_json=pending_cards,
+            )
+            db.session.add(job_card)
 
         db.session.commit()
 
