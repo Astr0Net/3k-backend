@@ -1,0 +1,100 @@
+Toggle bookmark
+---
+tags:
+  - Bookmark
+summary: Add or remove a job bookmark
+description: >
+  اگر job_url قبلاً بوک‌مارک شده باشد، حذف می‌شود (bookmarked: false).
+  در غیر این صورت بوک‌مارک اضافه می‌شود (bookmarked: true).
+  این endpoint جایگزین دو endpoint جداگانه add/remove است.
+security:
+  - BearerAuth: []
+consumes:
+  - application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    schema:
+      type: object
+      required:
+        - job_url
+      properties:
+        job_url:
+          type: string
+          example: "https://jobinja.ir/jobs/123"
+        job_title:
+          type: string
+          example: "Python Backend Developer"
+        company_name:
+          type: string
+          example: "Acme Co"
+        location:
+          type: string
+          example: "Tehran"
+        paycheck:
+          type: string
+          example: "Negotiable"
+        source_site:
+          type: string
+          example: "jobinja"
+        match_percent:
+          type: integer
+          example: 86
+        requirements:
+          type: array
+          items:
+            type: string
+          example: ["Python", "Flask", "PostgreSQL"]
+        company_reviews:
+          type: object
+          nullable: true
+          example: {"rating": 4.2, "summary": "محیط خوب"}
+responses:
+  200:
+    description: Bookmark removed
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: bookmark removed
+        data:
+          type: object
+          properties:
+            bookmarked:
+              type: boolean
+              example: false
+            job_url:
+              type: string
+  201:
+    description: Bookmark added
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: bookmark added
+        data:
+          type: object
+          properties:
+            bookmarked:
+              type: boolean
+              example: true
+            id:
+              type: integer
+              example: 7
+            job_url:
+              type: string
+  400:
+    description: job_url is required
+  401:
+    description: Missing or invalid JWT token
+  409:
+    description: Already bookmarked (race condition)

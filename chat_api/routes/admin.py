@@ -9,7 +9,7 @@ from ..utils.response_utils import api_ok, api_error
 from flasgger import swag_from
 from chat_api.service.docs_path import doc
 
-admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+admin_bp = Blueprint("admin", __name__)
 
 
 # -------------------------
@@ -41,7 +41,7 @@ def _require_admin():
 # Stats
 # -------------------------
 
-@admin_bp.route("/stats", methods=["GET"])
+@admin_bp.route("/admin/stats", methods=["GET"])
 @swag_from(doc("admin", "get_dashboard_stats.yml"))
 @jwt_required()
 def get_dashboard_stats():
@@ -69,7 +69,7 @@ def get_dashboard_stats():
 # Users: list + search
 # -------------------------
 
-@admin_bp.route("/users", methods=["GET"])
+@admin_bp.route("/admin/users", methods=["GET"])
 @swag_from(doc("admin", "get_users.yml"))
 @jwt_required()
 def get_users():
@@ -125,7 +125,7 @@ def get_users():
 # Users: delete
 # -------------------------
 
-@admin_bp.route("/users/<int:target_user_id>", methods=["DELETE"])
+@admin_bp.route("/admin/users/<int:target_user_id>", methods=["DELETE"])
 @swag_from(doc("admin", "delete_user.yml"))
 @jwt_required()
 def delete_user(target_user_id):
@@ -157,7 +157,7 @@ def delete_user(target_user_id):
 # Jobs: list + search + filter
 # -------------------------
 
-@admin_bp.route("/jobs", methods=["GET"])
+@admin_bp.route("/admin/jobs", methods=["GET"])
 @swag_from(doc("admin", "get_jobs.yml"))
 @jwt_required()
 def get_jobs():
@@ -235,7 +235,7 @@ def get_jobs():
 # Jobs: get single
 # -------------------------
 
-@admin_bp.route("/jobs/<int:job_id>", methods=["GET"])
+@admin_bp.route("/admin/jobs/<int:job_id>", methods=["GET"])
 @swag_from(doc("admin", "get_job.yml"))
 @jwt_required()
 def get_job(job_id):
@@ -272,7 +272,7 @@ def get_job(job_id):
 # Jobs: update
 # -------------------------
 
-@admin_bp.route("/jobs/<int:job_id>", methods=["PATCH"])
+@admin_bp.route("/admin/jobs/<int:job_id>", methods=["PATCH"])
 @swag_from(doc("admin", "update_job.yml"))
 @jwt_required()
 def update_job(job_id):
@@ -334,7 +334,7 @@ def update_job(job_id):
 # Jobs: delete
 # -------------------------
 
-@admin_bp.route("/jobs/<int:job_id>", methods=["DELETE"])
+@admin_bp.route("/admin/jobs/<int:job_id>", methods=["DELETE"])
 @swag_from(doc("admin", "delete_job.yml"))
 @jwt_required()
 def delete_job(job_id):

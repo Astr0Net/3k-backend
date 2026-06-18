@@ -19,7 +19,7 @@ from chat_api.service.docs_path import doc
 auth_bp = Blueprint("auth", __name__)
 
 
-@auth_bp.route("/register", methods=["POST"])
+@auth_bp.route("/auth/register", methods=["POST"])
 @swag_from(doc("auth", "register.yml"))
 def register():
     """
@@ -46,7 +46,7 @@ def register():
     return api_ok(data={"user": user.to_dict()}, message="user created", http_status=201)
 
 
-@auth_bp.route("/login", methods=["POST"])
+@auth_bp.route("/auth/login", methods=["POST"])
 @swag_from(doc("auth", "login.yml"))
 def login():
     """
@@ -81,7 +81,7 @@ def login():
     )
 
 
-@auth_bp.route("/refresh", methods=["POST"])
+@auth_bp.route("/auth/refresh", methods=["POST"])
 @swag_from(doc("auth", "refresh.yml"))
 @jwt_required(refresh=True)
 def refresh():
@@ -99,7 +99,7 @@ def refresh():
     )
 
 
-@auth_bp.route("/logout", methods=["POST"])
+@auth_bp.route("/auth/logout", methods=["POST"])
 @swag_from(doc("auth", "logout.yml"))
 @jwt_required()
 def logout():

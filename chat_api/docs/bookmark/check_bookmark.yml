@@ -1,0 +1,47 @@
+Check bookmark status
+---
+tags:
+  - Bookmark
+summary: Check if a job URL is bookmarked by the current user
+description: >
+  یک job_url را به‌عنوان query param می‌گیرد و
+  وضعیت بوک‌مارک بودن یا نبودن آن را برمی‌گرداند.
+  برای وضعیت اولیه دکمه بوک‌مارک در فرانت‌اند مفید است.
+security:
+  - BearerAuth: []
+parameters:
+  - in: query
+    name: job_url
+    type: string
+    required: true
+    description: URL of the job to check
+    example: "https://jobinja.ir/jobs/123"
+responses:
+  200:
+    description: Bookmark status
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: ok
+        data:
+          type: object
+          properties:
+            bookmarked:
+              type: boolean
+              example: true
+            id:
+              type: integer
+              nullable: true
+              example: 7
+            job_url:
+              type: string
+              example: "https://jobinja.ir/jobs/123"
+  400:
+    description: job_url query param is required
+  401:
+    description: Missing or invalid JWT token

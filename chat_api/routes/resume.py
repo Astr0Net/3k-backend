@@ -5,13 +5,13 @@ from chat_api.extensions import db
 from chat_api.models.resume import Resume
 from flasgger import swag_from
 from chat_api.service.docs_path import doc
-resume_bp = Blueprint("resume", __name__, url_prefix="/resumes")
+resume_bp = Blueprint("resume", __name__)
 
 
 # -------------------------
 # create resume
 # -------------------------
-@resume_bp.route("/", methods=["POST"])
+@resume_bp.route("/resumes", methods=["POST"])
 @swag_from(doc("resume", "create_resume.yml"))
 @jwt_required()
 def create_resume():
@@ -50,7 +50,7 @@ def create_resume():
 # -------------------------
 # list resumes
 # -------------------------
-@resume_bp.route("/", methods=["GET"])
+@resume_bp.route("/resumes", methods=["GET"])
 @swag_from(doc("resume", "list_resumes.yml"))
 @jwt_required()
 def list_resumes():
@@ -82,7 +82,7 @@ def list_resumes():
 # -------------------------
 # get single resume
 # -------------------------
-@resume_bp.route("/<int:resume_id>", methods=["GET"])
+@resume_bp.route("/resumes/<int:resume_id>", methods=["GET"])
 @swag_from(doc("resume", "get_resume.yml"))
 @jwt_required()
 def get_resume(resume_id):
@@ -110,7 +110,7 @@ def get_resume(resume_id):
 # -------------------------
 # update resume
 # -------------------------
-@resume_bp.route("/<int:resume_id>", methods=["PUT", "PATCH"])
+@resume_bp.route("/resumes/<int:resume_id>", methods=["PUT", "PATCH"])
 @swag_from(doc("resume", "update_resume.yml"))
 @jwt_required()
 def update_resume(resume_id):
@@ -154,7 +154,7 @@ def update_resume(resume_id):
 # -------------------------
 # delete resume
 # -------------------------
-@resume_bp.route("/<int:resume_id>", methods=["DELETE"])
+@resume_bp.route("/resumes/<int:resume_id>", methods=["DELETE"])
 @swag_from(doc("resume", "delete_resume.yml"))
 @jwt_required()
 def delete_resume(resume_id):
@@ -177,7 +177,7 @@ def delete_resume(resume_id):
 # -------------------------
 # import resume content
 # -------------------------
-@resume_bp.route("/<int:resume_id>/import", methods=["GET"])
+@resume_bp.route("/resumes/<int:resume_id>/import", methods=["GET"])
 @swag_from(doc("resume", "import_resume_content.yml"))
 @jwt_required()
 def import_resume_content(resume_id):

@@ -36,7 +36,7 @@ users_bp = Blueprint("users", __name__)
 #                       GET PROFILE
 # ============================================================
 
-@users_bp.route("/me", methods=["GET"])
+@users_bp.route("/user/me", methods=["GET"])
 @swag_from(doc("user", "get_me.yml"))
 @jwt_required()
 def get_me():
@@ -60,7 +60,7 @@ def get_me():
 #                       UPDATE PROFILE
 # ============================================================
 
-@users_bp.route("/me", methods=["PATCH"])
+@users_bp.route("/user/me", methods=["PATCH"])
 @swag_from(doc("user", "update_me.yml"))
 @jwt_required()
 def update_me():
@@ -140,7 +140,7 @@ def update_me():
 #                       CHANGE PASSWORD
 # ============================================================
 
-@users_bp.route("/me/password", methods=["PATCH"])
+@users_bp.route("/user/me/password", methods=["PATCH"])
 @swag_from(doc("user", "change_password.yml"))
 @jwt_required()
 def change_password():
@@ -183,7 +183,7 @@ def change_password():
 #                       DELETE ACCOUNT
 # ============================================================
 
-@users_bp.route("/me", methods=["DELETE"])
+@users_bp.route("/user/me", methods=["DELETE"])
 @swag_from(doc("user", "delete_account.yml"))
 @jwt_required()
 def delete_account():

@@ -1,0 +1,66 @@
+List bookmarks
+---
+tags:
+  - Bookmark
+summary: Get all bookmarked jobs for the authenticated user
+description: >
+  لیست کامل بوک‌مارک‌های کاربر را برمی‌گرداند،
+  مرتب‌شده از جدیدترین به قدیمی‌ترین.
+security:
+  - BearerAuth: []
+responses:
+  200:
+    description: List of bookmarks
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: ok
+        data:
+          type: object
+          properties:
+            bookmarks:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 7
+                  job_url:
+                    type: string
+                    example: "https://jobinja.ir/jobs/123"
+                  job_title:
+                    type: string
+                    example: "Python Backend Developer"
+                  company_name:
+                    type: string
+                    example: "Acme Co"
+                  location:
+                    type: string
+                    example: "Tehran"
+                  paycheck:
+                    type: string
+                    example: "Negotiable"
+                  source_site:
+                    type: string
+                    example: "jobinja"
+                  match_percent:
+                    type: integer
+                    example: 86
+                  requirements:
+                    type: array
+                    items:
+                      type: string
+                  company_reviews:
+                    type: object
+                    nullable: true
+                  created_at:
+                    type: string
+                    format: date-time
+  401:
+    description: Missing or invalid JWT token

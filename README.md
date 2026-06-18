@@ -33,6 +33,7 @@ This backend serves a smart career advisory application that:
 4. Returns the top 3 matching jobs as structured cards
 5. Generates a professional Persian-language advisory report via an LLM
 6. Streams the entire response token-by-token using SSE
+7. Allows users to **bookmark** job cards for later review
 
 All chat history is persisted per user, with an automatic summarization mechanism that compresses older messages into a rolling summary stored on the `Chat` model.
 
@@ -58,7 +59,10 @@ All chat history is persisted per user, with an automatic summarization mechanis
 │  │  Resume BP  │  │   Users BP   │  │    Admin BP      │   │
 │  │ /api/resumes│  │   /api/me    │  │   /api/admin     │   │
 │  └─────────────┘  └──────────────┘  └──────────────────┘   │
-│                                                            │
+│  ┌─────────────────────────────┐                           │
+│  │       Bookmark BP           │                           │
+│  │     /api/bookmarks          │                           │
+│  └─────────────────────────────┘                           │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                   Service Layer                     │   │
 │  │  intent_classifier → resume_report → job_scoring    │   │
@@ -71,7 +75,8 @@ All chat history is persisted per user, with an automatic summarization mechanis
 │   pgvector           │    │     (Qom University LLM)      │
 │   (jobs, users,      │    │     bge-m3 Embedding Model    │
 │    chats, messages,  │    └───────────────────────────────┘
-│    resumes, reviews) │
+│    resumes, reviews, │
+│    bookmarks)        │
 └──────────────────────┘
 ```
 
@@ -101,69 +106,55 @@ All chat history is persisted per user, with an automatic summarization mechanis
 
 ```
 .
-├── app.py                          # Application entry point
-├── config.py                       # Centralized configuration (env-based)
+├── app.py
+├── config.py
 ├── requirements.txt
-├── .gitignore
 │
 ├── chat_api/
-│   ├── __init__.py                 # App factory (create_app), CORS, Swagger, JWT setup
-│   ├── extensions.py               # Shared Flask extensions (db, bcrypt, jwt)
+│   ├── __init__.py
+│   ├── extensions.py
 │   │
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── user.py                 # User model (username, email, phone, role)
-│   │   ├── chat.py                 # Chat model (title, summary, last_summarized_message_id)
-│   │   ├── message.py              # Message model (role: user/assistant/system)
-│   │   ├── resume.py               # Resume model (title, content, user FK)
-│   │   ├── job.py                  # Job model (embedding, requirements, raw_text)
-│   │   ├── company.py              # Company model (reviews JSON)
-│   │   └── token_blocklist.py      # JWT revocation table
+│   │   ├── user.py
+│   │   ├── chat.py
+│   │   ├── message.py
+│   │   ├── resume.py
+│   │   ├── job.py
+│   │   ├── company.py
+│   │   ├── job_card.py
+│   │   ├── bookmark.py          ← جدید
+│   │   └── token_blocklist.py
 │   │
 │   ├── routes/
 │   │   ├── __init__.py
-│   │   ├── auth.py                 # /register, /login, /refresh, /logout
-│   │   ├── chat.py                 # GET/POST /chats, DELETE /chats/:id, PATCH title
-│   │   ├── message.py              # GET/POST /chats/:id/messages (SSE stream)
-│   │   ├── resume.py               # Full CRUD + /import endpoint
-│   │   ├── users.py                # /me profile, password change, account delete
-│   │   ├── admin.py                # /admin/stats (role-gated)
-│   │   └── landing.py              # /landing public stats + content
+│   │   ├── auth.py
+│   │   ├── chat.py
+│   │   ├── message.py
+│   │   ├── resume.py
+│   │   ├── users.py
+│   │   ├── admin.py
+│   │   ├── landing.py
+│   │   └── bookmark.py          ← جدید
 │   │
-│   ├── service/
-│   │   ├── qom_llm.py              # LLM chat completion wrapper + chunk_text
-│   │   ├── embeddings.py           # bge-m3 embedding + cosine_similarity + clamp_percent
-│   │   ├── intent_classifier.py    # LLM-based ANALYZE vs CHAT intent detection
-│   │   ├── resume_report.py        # Full RAG pipeline: embed → score → fetch reviews → report
-│   │   ├── job_scoring.py          # DB loading, scoring, card building, prompt text builder
-│   │   ├── company_reviews.py      # Exact + fuzzy company review fetcher + formatter
-│   │   ├── botMessage.py           # Chat mode: history assembly + LLM call + SSE yield
-│   │   ├── message_stream.py       # SSE orchestrator: intent → jobs → content → done
-│   │   ├── static_mock.py          # Static mock SSE stream for local dev/testing
-│   │   ├── memory_summary.py       # Rolling chat summary via LLM (every N messages)
-│   │   ├── title_gen.py            # Auto-generate 3-word Persian chat title from first message
-│   │   ├── auth_validators.py      # Username, password, email, phone validators (regex)
-│   │   └── docs_path.py            # Path helper for YAML doc files
+│   ├── service/  ...
+│   ├── utils/    ...
 │   │
-│   ├── utils/
-│   │   ├── response_utils.py       # api_ok(), api_error(), normalize_username()
-│   │   ├── message_utils.py        # message_dto(), sse() formatter
-│   │   ├── chat_utils.py           # chat_brief(), current_user_id(), get_chat_if_owner()
-│   │   └── requirements_utils.py   # normalize_requirements() for job requirement parsing
-│   │
-│   └── docs/                       # Swagger YAML documentation per endpoint
+│   └── docs/
 │       ├── auth/
 │       ├── chat/
 │       ├── message/
 │       ├── resume/
 │       ├── user/
 │       ├── admin/
-│       └── landing/
+│       ├── landing/
+│       └── bookmark/            ← جدید
+│           ├── toggle_bookmark.yml
+│           ├── list_bookmarks.yml
+│           ├── delete_bookmark.yml
+│           └── check_bookmark.yml
 │
 └── tests/
-    ├── test.py                     # LLM connectivity test
-    ├── test_db_connection.py       # PostgreSQL connectivity test
-    └── create_tables.py            # (reserved)
 ```
 
 ---
@@ -174,39 +165,34 @@ All chat history is persisted per user, with an automatic summarization mechanis
 - JWT-based auth with access + refresh tokens
 - Token revocation via `token_blocklist` table
 - Bcrypt password hashing
-- Username normalization (lowercase, stripped)
-- Input validation: username (3–32 chars, alphanumeric + `._-`), password (8–128 chars, must contain letter + digit)
 
 ### Chat System
 - Per-user isolated chat sessions
-- Auto-generated Persian chat title from first message (max 3 words, via LLM)
-- Manual title update (PATCH, max 60 chars)
-- Chat deletion with cascade to messages
-- Rolling memory summary: every 10 messages, older messages are compressed into `chat.summary` via LLM, injected into subsequent prompts as context
+- Auto-generated Persian chat title from first message
+- Rolling memory summary every 10 messages
 
 ### Resume Management
-- Full CRUD: create, list, get, update, delete
-- `/import` endpoint: returns only `content` field for importing into chat input
-- All resumes scoped to authenticated user
+- Full CRUD + `/import` endpoint
 
 ### RAG Job Matching Pipeline
-The core intelligence of the system:
+1. Intent Classification → ANALYZE / CHAT
+2. Embedding via bge-m3
+3. Cosine similarity against all job embeddings
+4. Top-3 selection
+5. Company reviews (exact + fuzzy match)
+6. Card building with `match_percent`
+7. LLM Persian advisory report
+8. SSE streaming
 
-1. **Intent Classification** — Every user message is classified as `ANALYZE` or `CHAT` using a zero-temperature LLM call with JSON output
-2. **Embedding** — Resume text is embedded via `bge-m3` (up to 4000 chars, padded/truncated to `EMBED_EXPECTED_DIM`)
-3. **Vector Scoring** — Cosine similarity computed in Python (numpy) against all job embeddings loaded from PostgreSQL
-4. **Top-3 Selection** — Jobs sorted by similarity score, top 3 selected
-5. **Company Reviews** — Exact-match then ILIKE fuzzy-match against `companies` table
-6. **Card Building** — Structured JSON cards with `match_percent`, `requirements`, `company_reviews`
-7. **LLM Report** — Full Persian advisory report generated with resume + job texts in prompt
-8. **SSE Streaming** — Report chunked at 220 chars and streamed as SSE `content` events
+### Bookmark System ← جدید
+- کاربر می‌تواند روی دکمه بوک‌مارک کنار هر کارت شغلی کلیک کند
+- Toggle endpoint: اگر بوک‌مارک وجود داشته باشد حذف می‌شود، در غیر این صورت اضافه می‌شود
+- لیست بوک‌مارک‌ها مخصوص هر کاربر و مرتب بر اساس زمان
+- بررسی وضعیت بوک‌مارک یک آدرس خاص (برای وضعیت اولیه دکمه در فرانت)
+- Constraint یکتایی: هر کاربر یک `job_url` را فقط یکبار بوک‌مارک می‌کند
 
 ### Admin Dashboard
-- Role-gated (`role = "admin"`) stats endpoint
-- Returns counts: users, jobs, chats, messages
-
-### Landing Page
-- Public endpoint returning platform statistics + full Persian landing content (hero, features, how-it-works, CTAs)
+- Role-gated stats endpoint
 
 ---
 
@@ -216,7 +202,7 @@ The core intelligence of the system:
 | Column | Type | Notes |
 |---|---|---|
 | `user_id` | Integer PK | |
-| `username` | String(255) | unique, indexed |
+| `username` | String(255) | unique |
 | `email` | String(255) | unique, nullable |
 | `phone_number` | String(20) | unique, nullable |
 | `password_hash` | String(255) | bcrypt |
@@ -228,10 +214,9 @@ The core intelligence of the system:
 |---|---|---|
 | `chat_id` | BigInteger PK | |
 | `user_id` | FK → users | |
-| `title` | String(255) | default: "گفتگوی جدید" |
+| `title` | String(255) | |
 | `summary` | Text | rolling LLM memory |
-| `last_summarized_message_id` | Integer | tracks summarization cursor |
-| `created_at` / `updated_at` | DateTime(tz) | |
+| `last_summarized_message_id` | Integer | |
 
 ### `messages`
 | Column | Type | Notes |
@@ -240,7 +225,6 @@ The core intelligence of the system:
 | `chat_id` | FK → chats | cascade delete |
 | `content` | Text | |
 | `role` | String(20) | `user`, `assistant`, `system` |
-| `created_at` | DateTime(tz) | |
 
 ### `resumes`
 | Column | Type | Notes |
@@ -249,237 +233,166 @@ The core intelligence of the system:
 | `user_id` | FK → users | ondelete CASCADE |
 | `title` | String(120) | |
 | `content` | Text | |
-| `created_at` / `updated_at` | DateTime(tz) | |
 
 ### `jobs`
 | Column | Type | Notes |
 |---|---|---|
 | `job_id` | BigInteger PK | |
 | `job_url` | Text | unique |
-| `source_site` | Text | |
-| `job_title` | Text | |
-| `company_name` | Text | |
-| `location` | Text | |
-| `paycheck` | Text | |
-| `requirements` | JSON | list/dict/str |
-| `raw_text` | Text | full ad text |
 | `embedding` | Vector(1536) | pgvector |
+| ... | | |
+
+### `job_cards`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | BigInteger PK | |
+| `message_id` | FK → messages | ondelete CASCADE |
+| `cards_json` | JSON | لیست کارت‌های شغلی |
+
+### `bookmarks` ← جدید
+| Column | Type | Notes |
+|---|---|---|
+| `id` | BigInteger PK | |
+| `user_id` | FK → users | ondelete CASCADE |
+| `job_url` | Text | |
+| `job_title` | Text | nullable |
+| `company_name` | Text | nullable |
+| `location` | Text | nullable |
+| `paycheck` | Text | nullable |
+| `source_site` | Text | nullable |
+| `match_percent` | Integer | nullable |
+| `requirements` | JSON | nullable |
+| `company_reviews` | JSON | nullable |
+| `created_at` | DateTime(tz) | |
+| **UNIQUE** | `(user_id, job_url)` | هر کاربر یک job_url را فقط یکبار |
 
 ### `companies`
 | Column | Type | Notes |
 |---|---|---|
 | `company_id` | BigInteger PK | |
 | `company_name` | Text | unique |
-| `reviews` | JSON | list/dict/str |
-| `updated_at` | DateTime | |
+| `reviews` | JSON | |
 
 ### `token_blocklist`
 | Column | Type | Notes |
 |---|---|---|
 | `id` | BigInteger PK | |
-| `jti` | String(36) | unique, indexed |
-| `token_type` | String(10) | `access` or `refresh` |
+| `jti` | String(36) | unique |
+| `token_type` | String(10) | |
 | `user_id` | FK → users | nullable |
-| `revoked_at` | DateTime | |
 
 ---
 
 ## API Reference
 
-Base URL: `/api`
-
-Swagger UI available at: `http://localhost:5000/apidocs`
+Base URL: `/api`  
+Swagger UI: `http://localhost:5000/apidocs`
 
 ### Auth — `/api/auth`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/register` | No | Register new user |
-| POST | `/auth/login` | No | Login, get access + refresh tokens |
+| POST | `/auth/login` | No | Login |
 | POST | `/auth/refresh` | Refresh token | Rotate access token |
-| POST | `/auth/logout` | Access token | Revoke current token |
+| POST | `/auth/logout` | Access token | Revoke token |
 
 ### Chats — `/api/chats`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/chats` | Yes | List all user chats (ordered by `updated_at desc`) |
-| POST | `/chats` | Yes | Create new chat |
-| DELETE | `/chats/:chat_id` | Yes | Delete chat + cascade messages |
-| PATCH | `/chats/:chat_id/title` | Yes | Update chat title (max 60 chars) |
+| GET | `/chats` | Yes | List user chats |
+| POST | `/chats` | Yes | Create chat |
+| DELETE | `/chats/:chat_id` | Yes | Delete chat |
+| PATCH | `/chats/:chat_id/title` | Yes | Update title |
 
-### Messages — `/api/chats/:chat_id/messages`
+### Messages
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/chats/:id/messages` | Yes | Get all messages in a chat |
-| POST | `/chats/:id/messages` | Yes | Send message, returns SSE stream |
+| GET | `/chats/:id/messages` | Yes | Get messages |
+| POST | `/chats/:id/messages` | Yes | Send message (SSE) |
 
 ### Resumes — `/api/resumes`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/resumes/` | Yes | Create resume |
-| GET | `/resumes/` | Yes | List all resumes (ordered by `updated_at desc`) |
-| GET | `/resumes/:id` | Yes | Get single resume |
-| PUT/PATCH | `/resumes/:id` | Yes | Update title or content |
-| DELETE | `/resumes/:id` | Yes | Delete resume |
-| GET | `/resumes/:id/import` | Yes | Get only content for chat import |
+| POST | `/resumes/` | Yes | Create |
+| GET | `/resumes/` | Yes | List |
+| GET | `/resumes/:id` | Yes | Get single |
+| PUT/PATCH | `/resumes/:id` | Yes | Update |
+| DELETE | `/resumes/:id` | Yes | Delete |
+| GET | `/resumes/:id/import` | Yes | Get content only |
 
 ### Users — `/api`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/me` | Yes | Get own profile |
-| PATCH | `/me` | Yes | Update username / email / phone |
+| GET | `/me` | Yes | Get profile |
+| PATCH | `/me` | Yes | Update profile |
 | PATCH | `/me/password` | Yes | Change password |
-| DELETE | `/me` | Yes | Delete account (cascade) |
+| DELETE | `/me` | Yes | Delete account |
+
+### Bookmarks — `/api/bookmarks` ← جدید
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/bookmarks/toggle` | Yes | Add or remove a bookmark (toggle) |
+| GET | `/bookmarks/` | Yes | List all bookmarks of the user |
+| DELETE | `/bookmarks/:id` | Yes | Delete bookmark by ID |
+| GET | `/bookmarks/check?job_url=...` | Yes | Check if a job_url is bookmarked |
+
+#### نحوه استفاده در فرانت‌اند
+
+```js
+// Toggle (add/remove) — کافی است همین یک endpoint را صدا بزنید
+POST /api/bookmarks/toggle
+Body: {
+  "job_url": "https://...",
+  "job_title": "Python Developer",
+  "company_name": "Acme",
+  "location": "Tehran",
+  "paycheck": "Negotiable",
+  "source_site": "jobinja",
+  "match_percent": 86,
+  "requirements": ["Python", "Flask"],
+  "company_reviews": { "rating": 4.2 }
+}
+
+// Response اگر اضافه شد → 201, bookmarked: true
+// Response اگر حذف شد → 200, bookmarked: false
+
+// لیست بوک‌مارک‌ها
+GET /api/bookmarks/
+
+// بررسی وضعیت
+GET /api/bookmarks/check?job_url=https://...
+```
 
 ### Admin — `/api/admin`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/admin/stats` | Admin role | Get platform-wide counts |
+| GET | `/admin/stats` | Admin | Platform stats |
+| GET | `/admin/users` | Admin | List users |
+| DELETE | `/admin/users/:id` | Admin | Delete user |
+| GET | `/admin/jobs` | Admin | List jobs |
+| GET | `/admin/jobs/:id` | Admin | Get job |
+| PATCH | `/admin/jobs/:id` | Admin | Update job |
+| DELETE | `/admin/jobs/:id` | Admin | Delete job |
 
-### Landing — `/api`
+### Landing & Debug
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/landing` | No | Get landing page content + live stats |
-
-### Debug
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/_debug/cors` | Returns allowed CORS origins |
-
----
-
-## Services & Modules
-
-### `qom_llm.py`
-Thin wrapper around the Qom LLM's OpenAI-compatible `/v1/chat/completions` endpoint.
-
-```python
-qom_chat(messages, temperature=None, max_tokens=None, timeout=None) -> str
-chunk_text(text, chunk_size=220) -> Generator[str]
-```
-
-Uses `Config.LLM_API_KEY`, `Config.LLM_MODEL`, `Config.LLM_TEMPERATURE`, `Config.LLM_MAX_TOKENS`. `chunk_text` simulates token-by-token streaming since the LLM is called synchronously.
-
----
-
-### `embeddings.py`
-Interfaces with the bge-m3 embedding API.
-
-```python
-get_embedding(text, task_type=None) -> np.ndarray   # shape: (EMBED_EXPECTED_DIM,)
-cosine_similarity(a, b) -> float                    # range: 0.0 – 1.0
-clamp_percent(score) -> int                         # converts to 0–100 integer
-```
-
-Input text is truncated to 4000 chars before embedding. Output is padded or truncated to `EMBED_EXPECTED_DIM` (from `.env`).
-
----
-
-### `intent_classifier.py`
-Classifies user input as `ANALYZE` (resume/job matching) or `CHAT` (general advisory).
-
-```python
-detect_intent(user_text) -> "ANALYZE" | "CHAT"
-```
-
-Uses zero-temperature LLM call with strict JSON output schema. Falls back to heuristic: `len(text) >= 120` → `ANALYZE`. Confidence threshold: if `< 0.55` and text is long → forces `ANALYZE`.
-
----
-
-### `resume_report.py`
-The main RAG pipeline, called when intent is `ANALYZE`.
-
-```python
-analyze_resume_stream(user_text) -> Generator
-```
-
-Yields in order:
-1. `str` — intro message
-2. `("jobs", {"items": [...]})` — structured job cards
-3. `str` chunks — LLM advisory report in 220-char pieces
-
----
-
-### `job_scoring.py`
-
-```python
-load_jobs_with_embeddings(cursor) -> list       # loads all jobs with non-null embeddings
-score_jobs(rows, resume_embedding) -> list      # sorted by cosine similarity desc
-build_cards(top_jobs, reviews_map) -> list      # structured card dicts
-build_jobs_text_for_prompt(top_jobs, reviews_map) -> str  # formatted text for LLM prompt
-open_conn() -> psycopg2.connection              # opens psycopg2 + registers pgvector
-```
-
----
-
-### `company_reviews.py`
-
-```python
-fetch_company_reviews(cursor, company_names) -> dict   # exact match then ILIKE fuzzy
-format_reviews_for_prompt(reviews, max_items=6) -> str # handles list/dict/str/None
-```
-
----
-
-### `botMessage.py`
-Handles the `CHAT` intent path. Assembles system prompt, rolling summary, last 6 messages, and current user message. Yields SSE tuples: `("intent", ...)`, `("content", chunk)`.
-
----
-
-### `message_stream.py`
-SSE orchestrator. Consumes `generate_bot_reply()` generator, emits `meta` event first, routes `jobs` events to SSE, accumulates `content` chunks, saves final `Message` to DB, triggers `maybe_update_chat_summary()`, emits `done` with `bot_message_id`.
-
----
-
-### `memory_summary.py`
-Rolling chat compressor.
-
-```python
-maybe_update_chat_summary(chat_id, user_id, every_n_messages=10)
-update_chat_summary(chat_id, user_id, chunk_limit=18)
-```
-
-Triggers only when `total_messages % every_n_messages == 0`. Reads messages newer than `last_summarized_message_id`. Appends new block to existing summary, re-summarizes via LLM, updates `chat.summary` and `chat.last_summarized_message_id`.
-
----
-
-### `title_gen.py`
-Auto-generates a short (max 3-word) Persian chat title from the first user message.
-
-```python
-generate_chat_title(first_user_message) -> str   # max 60 chars, fallback: "چت جدید"
-```
-
----
-
-### `auth_validators.py`
-
-| Function | Rules |
-|---|---|
-| `validate_username` | 3–32 chars, `^[a-z0-9._-]+$` |
-| `validate_password` | 8–128 chars, must contain letter + digit |
-| `validate_email` | Standard regex, max 255 chars |
-| `validate_phone_number` | Iranian format: `0912...`, `+98912...`, `98912...` |
-
----
-
-### `requirements_utils.py`
-Normalizes the `requirements` field from jobs, which can be `list`, `dict`, `str`, or `None`. Falls back to parsing bullet points (`•`, `-`, `*`, `–`) from `raw_text` if structured data is missing.
+| GET | `/landing` | No | Landing content + stats |
+| GET | `/api/_debug/cors` | No | CORS debug |
 
 ---
 
 ## SSE Streaming Protocol
 
 Every POST to `/api/chats/:id/messages` returns `Content-Type: text/event-stream`.
-
-### Event Sequence
 
 ```
 event: meta
@@ -491,7 +404,7 @@ data: {"items": [{
   "company_name": "...",
   "location": "...",
   "paycheck": "...",
-  "requirements": ["Python", "Flask", ...],
+  "requirements": ["Python", ...],
   "match_percent": 86,
   "job_url": "https://...",
   "source_site": "...",
@@ -508,141 +421,76 @@ event: error
 data: {"message": "..."}
 ```
 
-The `jobs` event is only emitted when `type == "analyze"`. Multiple `content` events are emitted sequentially. The stream always ends with either `done` or `error`.
+### نکته برای بوک‌مارک
 
-### Static Mock Mode
-For local development without LLM/DB access, `message.py` uses `stream_static_reply()` from `static_mock.py`. To switch to live mode, replace the call with `stream_bot_reply()` in `chat_api/routes/message.py`:
+وقتی فرانت‌اند `jobs` event را دریافت می‌کند، کنار هر کارت یک دکمه ستاره/بوک‌مارک نشان می‌دهد. با کلیک روی آن، اطلاعات کارت را به `POST /api/bookmarks/toggle` ارسال می‌کند.
+
+---
+
+## Static Mock Mode
 
 ```python
 # Development (default):
-stream_static_reply(chat, user_msg, content, user_id, title_changed)
+STATIC_MODE = True   # در routes/message.py
 
-# Production (live LLM + DB):
-stream_bot_reply(chat, user_msg, content, user_id, title_changed)
+# Production:
+STATIC_MODE = False
 ```
 
 ---
 
 ## Configuration
 
-All configuration is loaded from `.env` via `python-dotenv` in `config.py`.
-
 ```python
 class Config:
-    SECRET_KEY                # Flask secret
-    SQLALCHEMY_DATABASE_URI   # PostgreSQL DSN
+    SECRET_KEY
+    SQLALCHEMY_DATABASE_URI
     JWT_SECRET_KEY
-    JWT_ACCESS_TOKEN_EXPIRES  # from JWT_ACCESS_MINUTES
-    JWT_REFRESH_TOKEN_EXPIRES # from JWT_REFRESH_DAYS
-
-    LLM_BASE_URL              # e.g. https://llm.example.ir
-    LLM_CHAT_ENDPOINT         # e.g. /llm/v1/chat/completions
-    LLM_API_KEY
-    LLM_MODEL
-    LLM_TEMPERATURE
-    LLM_MAX_TOKENS
-    LLM_TIMEOUT
-
-    EMBED_BASE_URL
-    EMBED_MODEL               # bge-m3
-    EMBED_EXPECTED_DIM        # e.g. 1536
-    EMBED_TIMEOUT
+    JWT_ACCESS_TOKEN_EXPIRES   # JWT_ACCESS_MINUTES
+    JWT_REFRESH_TOKEN_EXPIRES  # JWT_REFRESH_DAYS
+    LLM_BASE_URL / LLM_CHAT_ENDPOINT / LLM_API_KEY / LLM_MODEL
+    LLM_TEMPERATURE / LLM_MAX_TOKENS / LLM_TIMEOUT
+    EMBED_BASE_URL / EMBED_MODEL / EMBED_EXPECTED_DIM / EMBED_TIMEOUT
 ```
 
 ---
 
 ## Installation & Setup
 
-### Prerequisites
-
-- Python 3.11+
-- PostgreSQL 15+ with `pgvector` extension
-- Access to Qom LLM API and Embed API
-
-### 1. Clone the repository
-
 ```bash
-git clone https://github.com/your-org/your-repo.git
-cd your-repo
-```
-
-### 2. Create virtual environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-.venv\Scripts\activate           # Windows
-```
-
-### 3. Install dependencies
-
-```bash
+git clone ...
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env   # مقادیر را پر کنید
 ```
-
-### 4. Configure environment
-
-```bash
-cp .env.example .env
-# Edit .env with your values
-```
-
-### 5. Enable pgvector on PostgreSQL
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-### 6. Initialize the database
-
-Tables are created automatically on first run via `db.create_all()` inside the app factory:
-
 ```bash
-python -c "from chat_api import create_app; app = create_app()"
+python app.py   # جداول به‌طور خودکار ساخته می‌شوند (db.create_all)
 ```
 
 ---
 
 ## Running the Project
 
-### Development
-
 ```bash
+# Development
 python app.py
-```
 
-Server starts at `http://0.0.0.0:5000`. Swagger UI at `http://localhost:5000/apidocs`.
-
-### Production
-
-```bash
+# Production
 gunicorn -w 1 -b 0.0.0.0:5000 --timeout 120 "app:app"
 ```
-
-> Use only 1 worker when relying on SSE/streaming. For scaling, use an async worker like `gevent`.
 
 ---
 
 ## Running Tests
 
-### Test LLM connectivity
-
 ```bash
-python tests/test.py
-```
-
-Expected output: `متصل شد.`
-
-### Test database connectivity
-
-```bash
-python tests/test_db_connection.py
-```
-
-Expected output:
-```
-✅ اتصال موفقیت‌آمیز بود!
-📦 نسخه PostgreSQL: PostgreSQL 15.x ...
+python tests/test.py            # LLM connectivity
+python tests/test_db_connection.py  # DB connectivity
 ```
 
 ---
@@ -650,33 +498,22 @@ Expected output:
 ## Environment Variables
 
 ```env
-# Flask
-SECRET_KEY=your-flask-secret-key
-
-# Database
+SECRET_KEY=...
 DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-
-# JWT
-JWT_SECRET_KEY=your-jwt-secret
+JWT_SECRET_KEY=...
 JWT_ACCESS_MINUTES=60
 JWT_REFRESH_DAYS=30
-
-# LLM (Chat)
 LLM_BASE_URL=https://llm.example.ir
 LLM_CHAT_ENDPOINT=/llm/v1/chat/completions
-LLM_API_KEY=your-llm-api-key
-LLM_MODEL=your-model-name
+LLM_API_KEY=...
+LLM_MODEL=...
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=2000
 LLM_TIMEOUT=60
-
-# Embedding
 EMBED_BASE_URL=https://embed.example.ir
 EMBED_MODEL=bge-m3
 EMBED_EXPECTED_DIM=1536
 EMBED_TIMEOUT=30
-
-# CORS
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
@@ -684,31 +521,13 @@ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 ## Response Format
 
-All non-SSE endpoints return a consistent JSON envelope.
-
-**Success:**
 ```json
-{
-  "status": 200,
-  "message": "ok",
-  "data": { ... }
-}
+// Success
+{ "status": 200, "message": "ok", "data": { ... } }
+
+// Error
+{ "status": 400, "error": "description", "data": null }
 ```
-
-**Error:**
-```json
-{
-  "status": 400,
-  "error": "description of error",
-  "data": null
-}
-```
-
----
-
-## CORS Configuration
-
-CORS is configured per the `CORS_ORIGINS` environment variable. If not set, defaults to `localhost:5173` variants. Only routes under `/api/*` are CORS-enabled. Authentication is handled via `Authorization: Bearer <token>` header; `supports_credentials` is `false`.
 
 ---
 

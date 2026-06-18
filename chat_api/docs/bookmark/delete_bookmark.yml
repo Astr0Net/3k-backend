@@ -1,0 +1,33 @@
+Delete bookmark
+---
+tags:
+  - Bookmark
+summary: Delete a bookmark by its ID
+description: حذف یک بوک‌مارک با آی‌دی آن.
+security:
+  - BearerAuth: []
+parameters:
+  - in: path
+    name: bookmark_id
+    type: integer
+    required: true
+    description: ID of the bookmark to delete
+responses:
+  200:
+    description: Bookmark deleted successfully
+    schema:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: bookmark deleted
+        data:
+          type: object
+          nullable: true
+  401:
+    description: Missing or invalid JWT token
+  404:
+    description: Bookmark not found

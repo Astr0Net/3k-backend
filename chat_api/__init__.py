@@ -9,22 +9,13 @@ from .models import TokenBlocklist
 
 
 def _get_allowed_origins():
-    """
-    خواندن لیست originهای مجاز از ENV.
-    نمونه:
-      CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://10.241.248.254:5173
-    """
     raw = os.getenv("CORS_ORIGINS", "").strip()
-
-    # اگر تنظیم نکردی، برای dev چند مورد رایج رو باز می‌گذاریم
     if not raw:
         return [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://0.0.0.0:5173",
         ]
-
-    # لیست واقعی از ENV
     return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
 
 
@@ -34,7 +25,6 @@ def create_app():
 
     allowed_origins = _get_allowed_origins()
 
-    # ✅ CORS مناسب برای React + JWT در Authorization header
     CORS(
         app,
         resources={r"/api/*": {"origins": allowed_origins}},
@@ -45,14 +35,12 @@ def create_app():
         supports_credentials=False,
     )
 
-    # ✅ Swagger / Flasgger
     Swagger(app)
 
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
 
-    # ---- Debug endpoint برای چک کردن CORS/Origin ----
     @app.get("/api/_debug/cors")
     def debug_cors():
         return jsonify(
@@ -62,7 +50,6 @@ def create_app():
             }
         )
 
-    # اگر توکن revoke شده بود، از اینجا بلاک میشه
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         jti = jwt_payload.get("jti")
@@ -75,7 +62,6 @@ def create_app():
             is not None
         )
 
-    # خطاهای JWT به صورت JSON تمیز
     @jwt.unauthorized_loader
     def jwt_missing_token(reason):
         return jsonify({"error": f"missing token: {reason}"}), 401
@@ -100,16 +86,17 @@ def create_app():
     from .routes.admin import admin_bp
     from .routes.resume import resume_bp
     from .routes.users import users_bp
+    from .routes.bookmark import bookmark_bp          # ← جدید
 
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(chat_bp, url_prefix="/api")
     app.register_blueprint(message_bp, url_prefix="/api")
     app.register_blueprint(landing_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(resume_bp, url_prefix="/api")
-    app.register_blueprint(users_bp, url_prefix='/api') 
+    app.register_blueprint(users_bp, url_prefix="/api")
+    app.register_blueprint(bookmark_bp, url_prefix="/api")  # ← جدید
 
-    # ساخت جداول
     with app.app_context():
         db.create_all()
 

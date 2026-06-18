@@ -6,3 +6,4 @@ from .job import Job
 from .company import Company
 from .resume import Resume
 from .job_card import JobCard
+from .bookmark import Bookmark
